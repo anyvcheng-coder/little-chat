@@ -7,6 +7,7 @@ import {
   IMAGE_PROVIDER_IDS,
   isPresetImageModel,
   PROVIDERS,
+  resolveImageEndpoint,
 } from '../../services/image/providers.js'
 import {
   setImageApiKey,
@@ -165,7 +166,7 @@ export const ImageSettings = () => {
           <div className={styles.apiKeyInput}>
             <input
               type="url"
-              placeholder={provider.origin}
+              placeholder={provider.origin + provider.apiPath}
               autoComplete="off"
               spellCheck={false}
               value={baseDraft}
@@ -179,6 +180,12 @@ export const ImageSettings = () => {
             />
           </div>
           <div className={styles.description}>{t('imageBaseUrlHint')}</div>
+          {/* 把拼好的完整地址显示出来：路径不对是最常见的报错原因，能直接看见就不用猜 */}
+          <div className={styles.endpoint}>
+            {t('imageEndpointPreview', {
+              url: resolveImageEndpoint(provider, baseDraft),
+            })}
+          </div>
         </div>
       </div>
       <div className={clsx(styles.cell, styles.row)}>

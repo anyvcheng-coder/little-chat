@@ -53,14 +53,17 @@ const MODEL: ChatModel = 'deepseek-flash'
 const SYSTEM_PROMPT = '该助手为DeepSeek，由深度求索公司创造。'
 /** 配置了生图 Key 时追加的约束：提到画图就必须交棒，不能用文字或假链接糊弄 */
 const IMAGE_SYSTEM_PROMPT =
-  '当用户想要一张图片（绘画、插画、海报、头像、封面、照片、表情包等）时，不要用文字描述画面代替出图，也不要编造图片链接：先判断画面要素，把需求扩写成具体可执行的画面描述，然后调用 generate_image 工具提交。' +
+  '你已经接入生图能力：generate_image 由客户端真实执行，调用后一定会返回图片并显示给用户。' +
+  '当用户想要一张图片（绘画、插画、海报、头像、封面、照片、表情包等）时，不要用文字描述画面代替出图，不要说“我无法生成图片”，也不要编造图片链接：先判断画面要素，把需求扩写成具体可执行的画面描述，然后调用 generate_image 提交。' +
   '提示词要写清主体、动作、环境、光线、视角、风格与画面比例，语言具体，不要寒暄和客套话。用户没指定风格时按需求合理选择。一次只调用一次 generate_image。' +
-  '如果用户上传了图片并要求修改、参考、延展或照着它生成，同样直接调用 generate_image：参考图会自动随请求提交，提示词只写要改动或新增的内容（例如「把背景换成海边黄昏」「整体改成水彩风格」「保持构图，换成夜景」），不要复述原图已有的细节。'
+  '如果用户上传了图片并要求修改、参考、延展或照着它生成，同样直接调用 generate_image：参考图会自动随请求提交，提示词只写要改动或新增的内容（例如「把背景换成海边黄昏」「整体改成水彩风格」「保持构图，换成夜景」），不要复述原图已有的细节。' +
+  '调用前后各写一句话即可，画面本身由界面展示，不要用文字复述画面。'
 
 /** 声明给模型、由客户端执行的生图工具；参数结构决定提示词与尺寸能否被稳定取到 */
 const IMAGE_TOOL: ClientTool = {
   name: 'generate_image',
-  description: '根据用户需求生成一张图片。必须先把需求扩写成完整、可执行的画面描述再调用。',
+  description:
+    '生成一张图片并显示给用户（客户端真实执行，必定返回图片）。只要用户想看图、要图或让你画图，就必须调用本工具，不要回答自己不能生成图片。调用前先把需求扩写成完整、可执行的画面描述。',
   input_schema: {
     type: 'object',
     properties: {
@@ -75,9 +78,11 @@ const IMAGE_TOOL: ClientTool = {
   },
 }
 
-/** 请求的系统提示词：没配生图 Key 时不提生图，避免模型调用不存在的工具 */
-const systemPrompt = () =>
-  hasImageKey() ? `${SYSTEM_PROMPT}\n\n${IMAGE_SYSTEM_PROMPT}` : SYSTEM_PROMPT
+/**
+ * 请求的系统提示词：生图能力始终声明。
+ * 没配 Key 时调用会落成「去设置里填 Key」的提示，比模型回一句「我不能生成图片」更有用。
+ */
+const systemPrompt = () => `${SYSTEM_PROMPT}\n\n${IMAGE_SYSTEM_PROMPT}`
 /** 保留最近打开的详情；当前会话、生成中及尚未成功保存的会话不淘汰。 */
 const SESSION_CACHE_LIMIT = 5
 /** 安全审核固定开启，所有请求都走扩展模式 */
@@ -1361,7 +1366,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
             messages,
             thinking: { type: initial.thinking ? 'enabled' : 'disabled' },
             safety_check: SAFETY_CHECK,
-            tools: buildTools(initial.search ?? false, hasImageKey()),
+            tools: buildTools(initial.search ?? false, true),
             ...(titleRequests.has(controller) ? { title: { enabled: true } } : {}),
           },
           controller.signal

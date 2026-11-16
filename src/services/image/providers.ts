@@ -47,8 +47,13 @@ export type ImageModel = {
 export type ImageProvider = {
   id: ImageProviderId
   label: string
-  /** 默认接口基址，请求发往 `${origin}/v1/images/...`；可在设置里换成中转地址 */
+  /** 默认接口域名；可在设置里换成中转地址 */
   origin: string
+  /**
+   * 域名后的版本段。方舟是 `/api/v3`（`/v1/...` 不存在，会 404 且错误响应不带跨域头，
+   * 浏览器里只会报 Failed to fetch），硅基流动与 OpenAI 是 `/v1`。
+   */
+  apiPath: string
   /** 申请 API Key 的地址 */
   consoleUrl: string
   /** 浏览器能否直连；false 时界面提示必须填中转地址（否则会被 CORS 拦截） */
@@ -126,6 +131,7 @@ export const PROVIDERS: Record<ImageProviderId, ImageProvider> = {
     id: 'siliconflow',
     label: '硅基流动',
     origin: 'https://api.siliconflow.cn',
+    apiPath: '/v1',
     consoleUrl: 'https://cloud.siliconflow.cn/account/ak',
     corsSafe: true,
     sizeField: 'image_size',
@@ -179,6 +185,7 @@ export const PROVIDERS: Record<ImageProviderId, ImageProvider> = {
     id: 'ark',
     label: '火山方舟',
     origin: 'https://ark.cn-beijing.volces.com',
+    apiPath: '/api/v3',
     consoleUrl: 'https://console.volcengine.com/ark',
     corsSafe: true,
     sizeField: 'size',
@@ -228,6 +235,7 @@ export const PROVIDERS: Record<ImageProviderId, ImageProvider> = {
     id: 'openai',
     label: 'OpenAI',
     origin: 'https://api.openai.com',
+    apiPath: '/v1',
     consoleUrl: 'https://platform.openai.com/api-keys',
     // api.openai.com 不返回跨域头，浏览器直连会被拦截，必须填中转地址
     corsSafe: false,
@@ -347,9 +355,33 @@ const LEGACY_MODEL_IDS: Record<string, string> = {
 
 export const migrateImageModel = (model: string): string => LEGACY_MODEL_IDS[model] ?? model
 
-/** 去掉末尾斜杠，允许用户填 `https://x.com/v1` 这种写法 */
+/** 去掉末尾斜杠，允许用户填 `https://x.com`、`https://x.com/v1` 或整条接口地址 */
 export const normalizeImageOrigin = (value: string): string =>
   value
     .trim()
     .replace(/\/+$/, '')
-    .replace(/\/v1$/, '')
+    // 直接粘贴文档里的完整接口地址时，把路径也去掉，只留基址
+    .replace(/\/images\/(?:generations|edits)$/i, '')
+    .replace(/\/+$/, '')
+
+/** 基址里是否已经带了版本段（`/v1`、`/api/v3` 之类） */
+const VERSION_SEGMENT = /\/(?:v\d+|api\/v\d+)$/i
+
+/**
+ * 拼出真正要请求的地址。
+ *
+ * 各家的版本段不一样：方舟是 `/api/v3/images/generations`，硅基流动与 OpenAI 是 `/v1/images/...`。
+ * 自填地址已经带版本段（中转常见写法）就按原样拼，否则补上该供应商的版本段。
+ */
+export const resolveImageEndpoint = (
+  provider: ImageProvider,
+  baseUrl: string | null | undefined,
+  kind: 'generations' | 'edits' = 'generations'
+): string => {
+  const path = kind === 'edits' ? '/images/edits' : '/images/generations'
+  const custom = normalizeImageOrigin(baseUrl ?? '')
+  if (!custom) {
+    return `${provider.origin}${provider.apiPath}${path}`
+  }
+  return VERSION_SEGMENT.test(custom) ? `${custom}${path}` : `${custom}${provider.apiPath}${path}`
+}

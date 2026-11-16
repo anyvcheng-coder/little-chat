@@ -198,6 +198,16 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+/* 拼好的完整请求地址：路径写错时一眼能看出来 */
+.endpoint {
+  margin-top: 4px;
+  font-family: var(--app-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-quaternary, var(--dsw-alias-label-tertiary));
+  word-break: break-all;
+}
+
 .error {
   font-size: 12px;
   line-height: 18px;

@@ -1,5 +1,10 @@
+import { Capacitor, CapacitorHttp } from '@capacitor/core'
 import type { ImageProvider, ImageReferenceSpec } from '../image/providers.js'
-import { getImageReferenceSpec, isImageSizeIgnored } from '../image/providers.js'
+import {
+  getImageReferenceSpec,
+  isImageSizeIgnored,
+  resolveImageEndpoint,
+} from '../image/providers.js'
 import { prepareReference, toDataUrl } from '../image/references.js'
 import { ApiError } from './client.js'
 
@@ -79,6 +84,35 @@ const fromBase64 = (value: string): Blob => {
 }
 
 const fromUrl = async (url: string, signal: AbortSignal): Promise<Blob> => {
+  // 接口只回外链时（例如不认识 response_format），图床一般不允许跨域读取，原生壳里改走系统网络栈
+  const native = nativeHttp()
+  if (native) {
+    try {
+      const response = await withAbort(
+        native.get({
+          url,
+          responseType: 'arraybuffer',
+          connectTimeout: 30_000,
+          readTimeout: 120_000,
+        }),
+        signal
+      )
+      if (response.status < 200 || response.status >= 300) {
+        throw new ApiError('http', `图片下载失败（HTTP ${response.status}）`, response.status)
+      }
+      const data: unknown = response.data
+      // 安卓侧 arraybuffer 会以 base64 字符串返回
+      if (typeof data === 'string') {
+        return fromBase64(data)
+      }
+      return new Blob([data as BlobPart], { type: 'image/png' })
+    } catch (error) {
+      if (error instanceof ApiError || signal.aborted) {
+        throw error
+      }
+      // 系统请求也失败时退回到 fetch 再试一次
+    }
+  }
   let response: Response
   try {
     response = await fetch(url, { signal })
@@ -125,6 +159,136 @@ const attachJsonReferences = (
   })
 }
 
+/** 统一的响应结果：原生与 fetch 两条通道都归一成「状态码 + 原始文本」 */
+type PostResult = { ok: boolean; status: number; text: string }
+
+/**
+ * 原生壳里可用的系统网络栈。
+ *
+ * WebView 里的 fetch 受跨域限制，而方舟、硅基流动的**错误响应不带跨域头**，
+ * 于是 401/404 这类真正的报错在浏览器里一律显示成 `Failed to fetch`，用户和我们都看不到原因。
+ * 安卓壳里改走 CapacitorHttp（系统网络栈），既没有跨域限制，也能读到接口返回的真实错误体。
+ */
+const nativeHttp = () => {
+  try {
+    return Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('CapacitorHttp')
+      ? CapacitorHttp
+      : null
+  } catch {
+    return null
+  }
+}
+
+/** 原生请求无法中途中止，用赛跑让「停止」立刻生效，晚到的结果直接丢掉 */
+const withAbort = <T>(task: Promise<T>, signal: AbortSignal): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(new DOMException('请求已中止', 'AbortError'))
+    if (signal.aborted) {
+      onAbort()
+      return
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+    task.then(
+      (value) => {
+        signal.removeEventListener('abort', onAbort)
+        resolve(value)
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', onAbort)
+        reject(error)
+      }
+    )
+  })
+
+/** 连不上时给出可操作的提示，而不是干巴巴一句 Failed to fetch */
+const networkError = (url: string, error: unknown): ApiError => {
+  const message = error instanceof Error ? error.message : String(error)
+  return new ApiError(
+    'network',
+    `请求没能完成：${url}。常见原因：Key 不是你选的那家（各家 Key 不通用）、模型没在控制台开通、接口地址填错。原始错误：${message}`
+  )
+}
+
+const postJson = async (
+  url: string,
+  body: Record<string, unknown>,
+  apiKey: string,
+  signal: AbortSignal
+): Promise<PostResult> => {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+  }
+  const native = nativeHttp()
+  if (native) {
+    try {
+      const response = await withAbort(
+        native.post({
+          url,
+          headers,
+          data: body,
+          // 直接要原始文本：既能自己解析，也能读到错误响应体
+          responseType: 'text',
+          // 出图慢（2K 常见 20 秒以上），连接与读取都给足时间
+          connectTimeout: 30_000,
+          readTimeout: 300_000,
+        }),
+        signal
+      )
+      return {
+        ok: response.status >= 200 && response.status < 300,
+        status: response.status,
+        text:
+          typeof response.data === 'string' ? response.data : JSON.stringify(response.data ?? ''),
+      }
+    } catch (error) {
+      if (signal.aborted) {
+        throw error
+      }
+      throw networkError(url, error)
+    }
+  }
+  let response: Response
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal,
+    })
+  } catch (error) {
+    if (signal.aborted) {
+      throw error
+    }
+    throw networkError(url, error)
+  }
+  return { ok: response.ok, status: response.status, text: await response.text().catch(() => '') }
+}
+
+/** multipart（OpenAI 改图）只能走 fetch：系统网络栈不收 FormData */
+const postForm = async (
+  url: string,
+  form: FormData,
+  apiKey: string,
+  signal: AbortSignal
+): Promise<PostResult> => {
+  let response: Response
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+      signal,
+    })
+  } catch (error) {
+    if (signal.aborted) {
+      throw error
+    }
+    throw networkError(url, error)
+  }
+  return { ok: response.ok, status: response.status, text: await response.text().catch(() => '') }
+}
+
 /** 生成图片；返回按接口顺序排列的原图 Blob，任一环节失败都抛出 ApiError */
 export const generateImages = async (
   { provider, apiKey, baseUrl, model, prompt, size, n, references = [] }: GenerateImagesOptions,
@@ -138,8 +302,7 @@ export const generateImages = async (
   const usesForm = !!spec && spec.transport === 'form' && prepared.length > 0
   const dataUrls = usesForm ? [] : await Promise.all(prepared.map(toDataUrl))
 
-  const origin = (baseUrl?.trim() || provider.origin).replace(/\/+$/, '').replace(/\/v1$/, '')
-  const endpoint = usesForm ? '/v1/images/edits' : '/v1/images/generations'
+  const url = resolveImageEndpoint(provider, baseUrl, usesForm ? 'edits' : 'generations')
 
   /** minimal 只保留必填字段，用于供应商不认识可选参数时回退重试 */
   const buildBody = (minimal: boolean): Record<string, unknown> => {
@@ -181,43 +344,35 @@ export const generateImages = async (
   }
 
   const post = (minimal: boolean) =>
-    fetch(`${origin}${endpoint}`, {
-      method: 'POST',
-      headers: usesForm
-        ? { Authorization: `Bearer ${apiKey}` }
-        : { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: usesForm ? buildForm(minimal) : JSON.stringify(buildBody(minimal)),
-      signal,
-    }).catch((error: unknown) => {
-      if (signal.aborted) {
-        throw error
-      }
-      throw new ApiError('network', error instanceof Error ? error.message : String(error))
-    })
+    usesForm
+      ? postForm(url, buildForm(minimal), apiKey, signal)
+      : postJson(url, buildBody(minimal), apiKey, signal)
 
-  let response = await post(false)
-  if (!response.ok) {
-    const text = await response.text().catch(() => '')
-    if (response.status === 400) {
+  let result = await post(false)
+  if (!result.ok) {
+    if (result.status === 400) {
       // 供应商不认识可选字段时，用只有必填项的请求体再试一次（参考图保留，否则会静默变成文生图）
       const fallback = await post(true)
       if (!fallback.ok) {
-        const fallbackText = await fallback.text().catch(() => '')
         throw new ApiError(
           'http',
-          readErrorMessage(fallbackText, fallback.statusText),
+          readErrorMessage(fallback.text, `HTTP ${fallback.status}`),
           fallback.status
         )
       }
-      response = fallback
+      result = fallback
     } else {
-      throw new ApiError('http', readErrorMessage(text, response.statusText), response.status)
+      throw new ApiError(
+        'http',
+        readErrorMessage(result.text, `HTTP ${result.status}`),
+        result.status
+      )
     }
   }
 
   let payload: unknown
   try {
-    payload = await response.json()
+    payload = JSON.parse(result.text)
   } catch {
     throw new ApiError('protocol', '生图接口返回的不是 JSON')
   }

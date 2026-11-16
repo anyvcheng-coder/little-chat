@@ -202,7 +202,8 @@ export const zh = {
   imageElapsed: '耗时 {seconds}s',
   imageBaseUrlLabel: '接口地址',
   imageBaseUrlHint:
-    '留空即用供应商默认地址。OpenAI 官方接口不允许浏览器跨域，使用它必须填中转或代理地址。',
+    '留空即用供应商默认地址（会自动补上 /api/v3 或 /v1）。OpenAI 官方接口不允许浏览器跨域，使用它必须填中转或代理地址。',
+  imageEndpointPreview: '实际请求：{url}',
   imageModelReferenceTag: '参考图',
   imageSizeFollowsReference: '尺寸跟随参考图',
   imageSizeAuto: '自动（按提示词）',

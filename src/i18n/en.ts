@@ -211,7 +211,8 @@ export const en = {
   imageElapsed: 'Took {seconds}s',
   imageBaseUrlLabel: 'API base URL',
   imageBaseUrlHint:
-    'Leave empty to use the provider default. The official OpenAI API blocks browser requests, so a relay or proxy URL is required.',
+    'Leave empty to use the provider default (the /api/v3 or /v1 prefix is added automatically). The official OpenAI API blocks browser requests, so a relay or proxy URL is required.',
+  imageEndpointPreview: 'Request URL: {url}',
   imageModelReferenceTag: 'reference',
   imageSizeFollowsReference: 'Size follows the reference image',
   imageSizeAuto: 'Auto (from the prompt)',
