@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#4c66f5" />
+      <stop offset="0.55" stop-color="#4d6bfe" />
+      <stop offset="1" stop-color="#7a4cf0" />
+    </linearGradient>
+    <linearGradient id="frame" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3f57f5" />
+      <stop offset="1" stop-color="#6a45f0" />
+    </linearGradient>
+    <radialGradient id="glow" cx="0.16" cy="0.08" r="0.7">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.22" />
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0" />
+    </radialGradient>
+    <clipPath id="photoClip">
+      <rect x="380" y="306" width="400" height="260" rx="56" />
+    </clipPath>
+    <clipPath id="circle">
+      <circle cx="512" cy="512" r="512" />
+    </clipPath>
+  </defs>
+
+  <!-- 圆形启动器图标（Android 7 及以下使用圆形的启动器） -->
+  <g clip-path="url(#circle)">
+    <rect width="1024" height="1024" fill="url(#bg)" />
+    <rect width="1024" height="1024" fill="url(#glow)" />
+    <g transform="translate(512 512) scale(0.86) translate(-512 -512)">
+      <path
+        d="M328 208h368c75 0 136 61 136 136v192c0 75-61 136-136 136H470l-96 96c-16 16-42 5-42-18V672h-4c-75 0-136-61-136-136V344c0-75 61-136 136-136Z"
+        fill="#ffffff"
+      />
+      <rect x="380" y="306" width="400" height="260" rx="56" fill="url(#frame)" />
+      <g clip-path="url(#photoClip)">
+        <circle cx="466" cy="396" r="30" fill="#ffffff" fill-opacity="0.94" />
+        <path
+          d="M380 566 500 434c10-11 27-11 37 0l63 72 50-54c10-11 27-11 37 0l93 114Z"
+          fill="#ffffff"
+          fill-opacity="0.96"
+        />
+      </g>
+      <path
+        d="M790 176c7 44 25 62 66 68-41 6-59 24-66 68-7-44-25-62-66-68 41-6 59-24 66-68Z"
+        fill="#ffd166"
+      />
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,80 @@
+.hint {
+  position: fixed;
+  top: 16px;
+  right: 12px;
+  left: 12px;
+  z-index: 690;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  width: fit-content;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 12px 40px 12px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 16px;
+  color: var(--dsw-alias-label-primary);
+  background-color: var(--dsw-alias-bg-layer-3);
+  box-shadow:
+    0 0 4px 2px rgba(0, 0, 0, 0.04),
+    0 6px 20px 0 rgba(0, 0, 0, 0.1);
+  animation: hintEnter 0.24s var(--ds-ease-in-out);
+}
+
+.icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font: var(--dsw-font-s-strong-14);
+}
+
+.desc {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+/* 移动端顶部有 60px 顶栏，引导卡落在它下面 */
+@media not all and (min-width: 768px) {
+  .hint {
+    top: calc(64px + var(--app-safe-top, 0px));
+    gap: 10px;
+    padding: 10px 34px 10px 10px;
+  }
+
+  .icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+  }
+
+  .desc {
+    font-size: 12px;
+    line-height: 17px;
+  }
+}
+
+@keyframes hintEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
