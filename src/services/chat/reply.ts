@@ -204,13 +204,10 @@ const isUsableReply = (message: Message): message is AssistantMessage =>
 
 /**
  * 有图片时用内容块数组：先文件后文本，文件按 Files API 的 file_id 引用。
- * 历史轮次的图片会在每次请求里重新计费，只用最近几轮的视觉上下文。
+ * 图片原样带上，进出上下文一律由预算裁剪决定，避免靠前的位置每轮变动。
  */
-const toUserParam = (
-  { content, files }: UserMessage,
-  keepImages = true
-): MessageParam => {
-  const blocks = toFileBlocks(keepImages ? files : files.filter((file) => !file.isImage))
+const toUserParam = ({ content, files }: UserMessage): MessageParam => {
+  const blocks = toFileBlocks(files)
   return blocks.length === 0
     ? { role: 'user', content }
     : {
@@ -310,14 +307,20 @@ export const getContextRounds = (history: Message[]): [UserMessage, AssistantMes
 const CONTEXT_TOKEN_BUDGET = 16000
 /** 无论预算如何都保留的最近轮数，保证追问和指代还有落点 */
 const CONTEXT_MIN_ROUNDS = 3
-/** 只有最近几轮的图片进入上下文：更早的图每轮都会重新计费，视觉信息也已过时 */
-const CONTEXT_IMAGE_ROUNDS = 2
+/**
+ * 裁剪点的对齐粒度（轮）。服务端上下文缓存按前缀匹配，只要开头变了，后面全部失效。
+ * 预算裁剪如果每轮都滑动一格，就等于每轮都从头计费；对齐后开头在连续几轮内稳定，
+ * 只在跨过对齐边界时变一次，代价被摊到若干轮上。
+ */
+const CONTEXT_TRIM_STEP = 4
 /** 图片按 file_id 引用由服务端折算，单张按经验值计入预算 */
 const IMAGE_TOKEN_ESTIMATE = 1200
 
 /** 单轮（提问 + 回答）的 token 粗估，用于决定哪些历史轮次值得带上 */
 const estimateRoundTokens = ([user, reply]: [UserMessage, AssistantMessage]): number => {
   let total = estimateTokens(user.content)
+  // 图片随轮次一起进出上下文，必须计入本轮成本，否则预算会被图片撑破。
+  total += user.files.filter((file) => file.isImage).length * IMAGE_TOKEN_ESTIMATE
   for (const block of reply.blocks) {
     if (block.type === 'text') {
       total += estimateTokens(block.text)
@@ -355,13 +358,7 @@ export const toRequestMessages = (
   const rounds = getContextRounds(history)
   // 从最近一轮往前装，装不下就停；最近几轮始终保留。
   let kept = rounds.length
-  // 最近几轮的图片一定会带上，先把这部分固定开销从预算里扣掉。
-  let budget =
-    CONTEXT_TOKEN_BUDGET -
-    rounds
-      .slice(-CONTEXT_IMAGE_ROUNDS)
-      .reduce((sum, [user]) => sum + user.files.filter((file) => file.isImage).length, 0) *
-      IMAGE_TOKEN_ESTIMATE
+  let budget = CONTEXT_TOKEN_BUDGET
   while (kept > 0) {
     const cost = estimateRoundTokens(rounds[kept - 1])
     if (rounds.length - kept >= CONTEXT_MIN_ROUNDS && cost > budget) {
@@ -370,7 +367,13 @@ export const toRequestMessages = (
     budget -= cost
     kept -= 1
   }
-  const note = kept > 0 ? `（此前还有 ${kept} 轮对话，为控制费用已省略）` : ''
+  // 对齐的是起点而不是长度：省略轮数取整到步长倍数，起点在若干轮内固定，
+  // 请求因此退化成「同一段历史 + 尾部追加」，前缀能被服务端缓存复用。
+  if (kept > 0) {
+    kept = Math.floor(kept / CONTEXT_TRIM_STEP) * CONTEXT_TRIM_STEP
+  }
+  // 提示语里不带轮数：数字一变，第一个 token 就变了，前面全部缓存失效。
+  const note = kept > 0 ? '（更早的对话已省略）' : ''
   const visible = rounds.slice(kept)
   for (const [index, [user, reply]] of visible.entries()) {
     const subject = index === 0 && note ? { ...user, content: `${note}\n${user.content}` } : user
@@ -379,10 +382,9 @@ export const toRequestMessages = (
       continue
     }
     appendReminder(reply.latestReminder)
-    messages.push(
-      toUserParam(subject, index >= visible.length - CONTEXT_IMAGE_ROUNDS),
-      toAssistantParam(reply)
-    )
+    // 图片不再按「最近 N 轮」滑动剥离：那样每加一轮都会改动靠前的位置，前缀缓存必定失效。
+    // 旧图随轮次一起被预算裁掉即可。
+    messages.push(toUserParam(subject), toAssistantParam(reply))
   }
   appendReminder(latestReminder)
   messages.push(toUserParam(question))
