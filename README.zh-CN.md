@@ -33,7 +33,7 @@ pnpm build
 
 **[下载 latest APK](https://github.com/anyvcheng-coder/little-chat/releases/latest/download/little-chat.apk)**
 
-手机浏览器打开上面的链接直接下载，安装时允许「安装未知来源应用」即可。这是 debug 签名的自用包，不上应用商店；首次打开在设置里填 API Key 和生图接口，之后所有会话与图片都存在手机本地。
+手机浏览器打开上面的链接直接下载，安装时允许「安装未知来源应用」即可。这是 debug 签名的自用包，不上应用商店；首次打开在设置里填 API Key 和生图接口，之后所有会话与图片都存在手机本地。换了机器重新构建的包签名不同，覆盖安装前要先卸载旧版。
 
 重新出包（本机需要 JDK 21 与 Android SDK 36，或用 Android Studio 打开 [android/](android/)）：
 

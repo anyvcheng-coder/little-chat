@@ -33,7 +33,7 @@ The output is written to `dist/`. Deploy it to a static web server or open `dist
 
 **[Download the latest APK](https://github.com/anyvcheng-coder/little-chat/releases/latest/download/little-chat.apk)**
 
-Open that link on the phone and allow "install unknown apps". It is a debug-signed build for personal use, not a store release; enter your API key and image settings on first launch, and everything stays on the device.
+Open that link on the phone and allow "install unknown apps". It is a debug-signed build for personal use, not a store release; enter your API key and image settings on first launch, and everything stays on the device. A build made on another machine carries a different signature, so uninstall the old app before installing it.
 
 Rebuild it locally (JDK 21 and Android SDK 36, or open [android/](android/) in Android Studio):
 
