@@ -52,10 +52,10 @@
   right: 8px;
 }
 
-/* 移动端顶部有 60px 顶栏，引导卡落在它下面 */
+/* 移动端顶部有 64px 顶栏，引导卡落在它下面 */
 @media not all and (min-width: 768px) {
   .hint {
-    top: calc(64px + var(--app-safe-top, 0px));
+    top: calc(70px + var(--app-safe-top, 0px));
     gap: 10px;
     padding: 10px 34px 10px 10px;
   }

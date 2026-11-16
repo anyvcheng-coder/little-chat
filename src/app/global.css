@@ -58,9 +58,20 @@ body.change-theme *::after {
   }
 }
 
-/* 安装到主屏幕后界面顶到状态栏下方，只有这时才需要避让刘海 */
+/*
+ * 顶部安全区：安卓壳从 Android 15 起强制 edge-to-edge，网页安装到主屏幕后也是
+ * 独立窗口，两者都会把界面画到状态栏底下。原来只在 display-mode: standalone 时
+ * 取值，但原生 WebView 的 display-mode 是 browser，导致手机上一直顶到状态栏。
+ * 移动端一律按 env() 避让，桌面浏览器该值为 0，不受影响。
+ */
+@media not all and (min-width: 768px) {
+  :root {
+    --app-safe-top: env(safe-area-inset-top, 0px);
+  }
+}
+
 @media (display-mode: standalone) {
   :root {
-    --app-safe-top: env(safe-area-inset-top);
+    --app-safe-top: env(safe-area-inset-top, 0px);
   }
 }

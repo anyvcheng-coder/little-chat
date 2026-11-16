@@ -3,8 +3,9 @@
   align-items: center;
   flex-shrink: 0;
   box-sizing: border-box;
-  height: 60px;
-  padding: 12px 10px 4px;
+  /* 顶栏只在移动端出现：多留 4px，按钮不贴着状态栏，单手持机也好点 */
+  height: 64px;
+  padding: 14px 10px 6px;
 }
 
 .title {

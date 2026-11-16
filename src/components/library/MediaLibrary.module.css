@@ -7,8 +7,9 @@
 }
 
 .dialogMobile {
-  width: calc(100vw - 16px);
-  height: calc(100vh - 24px);
+  /* 用百分比而不是 100vh：遮罩已经扣掉状态栏与底部横条，再用 vh 会顶出屏幕 */
+  width: calc(100% - 16px);
+  height: 100%;
   max-height: none;
   padding: 16px 12px 10px;
   border-radius: 20px;
@@ -337,13 +338,14 @@
 
 .previewClose {
   position: absolute;
-  top: calc(12px + var(--app-safe-top, 0px));
+  /* 大图预览的关闭按钮同理，往下挪一点、放大到 40px */
+  top: calc(16px + var(--app-safe-top, 0px));
   right: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border: none;
   border-radius: 50%;
   background-color: rgba(255, 255, 255, 0.14);

@@ -60,6 +60,28 @@
   }
 }
 
+/* 手机上无论有没有状态栏，都再留一点边：弹窗标题与关闭按钮不贴屏幕顶 */
+@media not all and (min-width: 768px) {
+  .overlay {
+    padding-top: calc(var(--app-safe-top, 0px) + 12px);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+  }
+}
+
+/* 手机上关闭按钮要够大够好点：命中区 40px，图标也放大一号 */
+@media not all and (min-width: 768px) {
+  .close.close {
+    width: 40px;
+    height: 40px;
+    margin-right: -12px;
+  }
+
+  .close svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
 .main {
   color: var(--dsw-alias-label-secondary);
 }

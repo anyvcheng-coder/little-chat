@@ -239,6 +239,10 @@
   bottom: 0;
   left: 0;
   z-index: 800;
+  box-sizing: border-box;
+  /* 抽屉铺到屏幕边缘，内容自己避让状态栏与底部横条 */
+  padding-top: var(--app-safe-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .drawerMask {
