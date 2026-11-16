@@ -181,6 +181,9 @@ export const loadSessionSummaries = async (): Promise<SessionSummary[]> =>
 export const loadSession = async (id: string): Promise<Session | undefined> =>
   (await getDB()).get('sessions', id)
 
+/** 读取全部会话（不含文件原件），用于统计等批量场景 */
+export const loadAllSessions = async (): Promise<Session[]> => (await getDB()).getAll('sessions')
+
 export const saveSession = async (session: Session, files: StoredFile[] = []): Promise<void> => {
   const summary = storedSummary(session)
   const tx = (await getDB()).transaction(['sessions', 'sessionSummaries', 'files'], 'readwrite')

@@ -275,4 +275,7 @@ export const en = {
   libraryAddedToInput: 'Added to the input box',
   libraryNeedKey: 'Add an API key in Settings before using images as references',
   libraryOpenSession: 'Open chat',
+  messageUsageDetail: 'This request: {input} input ({cached} cached), {output} output, about {cost}',
+  usageTotalLabel: 'Usage on this device',
+  usageTotalDetail: '{requests} requests · {tokens} tokens · about {cost}',
 } satisfies Record<keyof typeof zh, string>

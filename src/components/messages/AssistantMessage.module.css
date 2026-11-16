@@ -104,6 +104,31 @@
   opacity: 1;
 }
 
+/* 每轮用量的估算费用：弱化成附注，点按看明细 */
+.usage {
+  flex-shrink: 0;
+  padding: 2px 4px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--dsw-alias-label-tertiary);
+  font: inherit;
+  font-size: 11px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  user-select: none;
+
+  &:hover {
+    color: var(--dsw-alias-label-secondary);
+    background-color: var(--dsw-alias-interactive-bg-hover);
+  }
+
+  &:focus-visible {
+    box-shadow: 0 0 0 2px var(--dsw-alias-button-primary-fill);
+  }
+}
+
 .continueButton {
   margin-left: auto;
 }
@@ -148,5 +173,13 @@
   .actions button {
     min-width: 36px;
     min-height: 36px;
+  }
+
+  /* 用量是文字附注，不跟着撑成方块 */
+  .actions .usage {
+    min-width: auto;
+    min-height: 30px;
+    padding: 0 4px;
+    font-size: 12px;
   }
 }

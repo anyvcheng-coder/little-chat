@@ -14,6 +14,7 @@ import type {
   ReplyStatus,
   UserMessage,
 } from './types.js'
+import { estimateTokens } from '../usage.js'
 
 /**
  * 文件按 Files API 的 file_id（附件的 serverId）引用：图片用 image 块，其余用 document 块。
@@ -201,9 +202,15 @@ const isUsableReply = (message: Message): message is AssistantMessage =>
   !message.blocks.some((block) => block.type === 'text' && block.isTemplate) &&
   getReplyText(message) !== ''
 
-/** 有文件时用内容块数组：先文件后文本，文件按 Files API 的 file_id 引用 */
-const toUserParam = ({ content, files }: UserMessage): MessageParam => {
-  const blocks = toFileBlocks(files)
+/**
+ * 有图片时用内容块数组：先文件后文本，文件按 Files API 的 file_id 引用。
+ * 历史轮次的图片会在每次请求里重新计费，只用最近几轮的视觉上下文。
+ */
+const toUserParam = (
+  { content, files }: UserMessage,
+  keepImages = true
+): MessageParam => {
+  const blocks = toFileBlocks(keepImages ? files : files.filter((file) => !file.isImage))
   return blocks.length === 0
     ? { role: 'user', content }
     : {
@@ -297,8 +304,37 @@ export const getContextRounds = (history: Message[]): [UserMessage, AssistantMes
 }
 
 /**
+ * 上下文预算：历史轮次会随每次请求完整重发，轮数越多单次输入越大、累计按平方增长。
+ * 超出预算就从最旧的轮次开始省略，只留最近若干轮。
+ */
+const CONTEXT_TOKEN_BUDGET = 16000
+/** 无论预算如何都保留的最近轮数，保证追问和指代还有落点 */
+const CONTEXT_MIN_ROUNDS = 3
+/** 只有最近几轮的图片进入上下文：更早的图每轮都会重新计费，视觉信息也已过时 */
+const CONTEXT_IMAGE_ROUNDS = 2
+/** 图片按 file_id 引用由服务端折算，单张按经验值计入预算 */
+const IMAGE_TOKEN_ESTIMATE = 1200
+
+/** 单轮（提问 + 回答）的 token 粗估，用于决定哪些历史轮次值得带上 */
+const estimateRoundTokens = ([user, reply]: [UserMessage, AssistantMessage]): number => {
+  let total = estimateTokens(user.content)
+  for (const block of reply.blocks) {
+    if (block.type === 'text') {
+      total += estimateTokens(block.text)
+    } else if (block.type === 'thinking') {
+      total += estimateTokens(block.thinking)
+    } else if (block.type === 'web_fetch_tool_result') {
+      // 阅读链接的正文会随请求回传，网页长的按实际体积占预算
+      total += estimateTokens(JSON.stringify(block.content))
+    }
+  }
+  return total
+}
+
+/**
  * 把会话转成请求的 messages：只保留「提问 + 有回答的回复」成对的轮次，最后接上本轮提问。
  * 失败或没有回答的轮次不进上下文。续写时末尾再带上本轮 assistant。
+ * 历史轮次按预算从最旧的开始省略，被省略时在首个提问前注明，避免模型以为对话从中间开始。
  */
 export const toRequestMessages = (
   history: Message[],
@@ -316,13 +352,37 @@ export const toRequestMessages = (
       previousReminder = reminder
     }
   }
-  for (const [user, reply] of getContextRounds(history)) {
+  const rounds = getContextRounds(history)
+  // 从最近一轮往前装，装不下就停；最近几轮始终保留。
+  let kept = rounds.length
+  // 最近几轮的图片一定会带上，先把这部分固定开销从预算里扣掉。
+  let budget =
+    CONTEXT_TOKEN_BUDGET -
+    rounds
+      .slice(-CONTEXT_IMAGE_ROUNDS)
+      .reduce((sum, [user]) => sum + user.files.filter((file) => file.isImage).length, 0) *
+      IMAGE_TOKEN_ESTIMATE
+  while (kept > 0) {
+    const cost = estimateRoundTokens(rounds[kept - 1])
+    if (rounds.length - kept >= CONTEXT_MIN_ROUNDS && cost > budget) {
+      break
+    }
+    budget -= cost
+    kept -= 1
+  }
+  const note = kept > 0 ? `（此前还有 ${kept} 轮对话，为控制费用已省略）` : ''
+  const visible = rounds.slice(kept)
+  for (const [index, [user, reply]] of visible.entries()) {
+    const subject = index === 0 && note ? { ...user, content: `${note}\n${user.content}` } : user
     // 历史提问没有文字、附件也都没有 serverId 时，提问为空，连同回答一起省略。
-    if (!user.content && toFileBlocks(user.files).length === 0) {
+    if (!subject.content && toFileBlocks(subject.files).length === 0) {
       continue
     }
     appendReminder(reply.latestReminder)
-    messages.push(toUserParam(user), toAssistantParam(reply))
+    messages.push(
+      toUserParam(subject, index >= visible.length - CONTEXT_IMAGE_ROUNDS),
+      toAssistantParam(reply)
+    )
   }
   appendReminder(latestReminder)
   messages.push(toUserParam(question))

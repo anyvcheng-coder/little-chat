@@ -265,4 +265,7 @@ export const zh = {
   libraryAddedToInput: '已添加到输入框',
   libraryNeedKey: '先在设置里填写 API Key，再把图片用作参考图',
   libraryOpenSession: '查看原会话',
+  messageUsageDetail: '本次请求：输入 {input}（缓存命中 {cached}），输出 {output}，估算 {cost}',
+  usageTotalLabel: '本机累计用量',
+  usageTotalDetail: '{requests} 次请求 · {tokens} tokens · 约 {cost}',
 } as const

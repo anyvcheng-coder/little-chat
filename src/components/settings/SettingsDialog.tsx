@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   IconDarkOutline16,
   IconDataOutline16,
@@ -19,6 +19,8 @@ import {
 } from '../../services/chat/backup.js'
 import { useIsMobile } from '../../app/viewport.js'
 import { useChatStore } from '../../services/chat/store.js'
+import { loadAllSessions } from '../../services/chat/db.js'
+import { estimateCost, formatCost, formatTokens, totalTokens } from '../../services/usage.js'
 import { regionCodes, getRegionName, provinces } from '../../services/location.js'
 import {
   isChineseBrowser,
@@ -122,6 +124,7 @@ const SettingsContent = () => {
           ) : (
             <>
               <ApiKeyField editor={apiKeyEditor} />
+              <UsageSummary />
               <ImportHistory historyImport={historyImport} disabled={historyBusy} />
               <ExportHistory disabled={historyBusy} />
               <SettingCell
@@ -454,8 +457,60 @@ const SettingCell = ({
   )
 }
 
-/** 选文件后先提示覆盖；确认后才检查文件并执行导入，任何错误都提示导入失败。 */
-const useHistoryImport = () => {
+/**
+ * 本机累计用量：把每条回复回传的 usage 加起来。
+ * 输入 token 会随对话轮数复利增长，把它摊开看才知道钱花在重复发送上。
+ */
+const UsageSummary = () => {
+  const t = useTranslate()
+  const [total, setTotal] = useState<{ requests: number; tokens: number; cost: number } | null>(null)
+  useEffect(() => {
+    let alive = true
+    loadAllSessions()
+      .then((sessions) => {
+        if (!alive) {
+          return
+        }
+        let requests = 0
+        let tokens = 0
+        let cost = 0
+        for (const session of sessions) {
+          for (const message of session.messages) {
+            if (message.role !== 'assistant' || !message.usage) {
+              continue
+            }
+            requests += 1
+            tokens += totalTokens(message.usage)
+            cost += estimateCost(message.usage, message.createdAt)
+          }
+        }
+        setTotal({ requests, tokens, cost })
+      })
+      .catch(() => setTotal(null))
+    return () => {
+      alive = false
+    }
+  }, [])
+  if (!total || total.requests === 0) {
+    return null
+  }
+  return (
+    <div className={clsx(styles.cell, styles.row)}>
+      <div className={styles.text}>
+        <div className={styles.label}>{t('usageTotalLabel')}</div>
+        <div className={styles.description}>
+          {t('usageTotalDetail', {
+            requests: total.requests,
+            tokens: formatTokens(total.tokens),
+            cost: formatCost(total.cost),
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** 选文件后先提示覆盖；确认后才检查文件并执行导入，任何错误都提示导入失败。 */const useHistoryImport = () => {
   const [file, setFile] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<Status>(null)

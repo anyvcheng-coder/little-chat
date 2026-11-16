@@ -10,6 +10,8 @@ import type { AssistantMessage as AssistantMessageType } from '../../services/ch
 import { openSettings } from '../settings/settingsDialogState.js'
 import { IconButton } from '../base/IconButton.js'
 import { Button } from '../base/Button.js'
+import { showToast } from '../base/toastState.js'
+import { estimateCost, formatCost, formatTokens } from '../../services/usage.js'
 import { Markdown } from '../markdown/Markdown.js'
 import { SiteThumbnails } from '../search/SiteLogo.js'
 import { toggleSearchPanel, useSearchPanel } from '../search/searchPanelState.js'
@@ -57,6 +59,15 @@ export const AssistantMessage = memo(function AssistantMessage({
   const copyText = responseText || notice?.text
   const waiting = streaming && view.steps.length === 0 && !view.answer && !message.thinking
   const summaryEntry = `${message.id}-summary`
+  // 每轮请求的用量与估算费用：接口已经回传，展示出来才知道钱花在哪
+  const usageDetail = message.usage
+    ? t('messageUsageDetail', {
+        input: formatTokens(message.usage.input_tokens + message.usage.cache_creation_input_tokens),
+        cached: formatTokens(message.usage.cache_read_input_tokens),
+        output: formatTokens(message.usage.output_tokens),
+        cost: formatCost(estimateCost(message.usage, message.createdAt)),
+      })
+    : ''
   return (
     <div className={styles.message}>
       {refused ? null : (
@@ -169,6 +180,17 @@ export const AssistantMessage = memo(function AssistantMessage({
                 regenerateReply(sessionId, message.id)
               }}
             />
+            {message.usage ? (
+              <button
+                type="button"
+                className={styles.usage}
+                aria-label={usageDetail}
+                title={usageDetail}
+                onClick={() => showToast(usageDetail)}
+              >
+                {formatCost(estimateCost(message.usage, message.createdAt))}
+              </button>
+            ) : null}
           </div>
           {isLast && canContinueReply(message) ? (
             <Button
