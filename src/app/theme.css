@@ -251,3 +251,49 @@ body {
 
   --dsw-font-xs-13: 13px/20px var(--dsw-font-family);
 }
+
+/* ---------- 个性化：主题色与聊天背景 ----------
+ * 只有用户在设置里改过时才生效：body 上有 data-app-accent / data-app-wallpaper 才覆盖。
+ * 这些规则必须排在浅色、深色两组别名之后，才能改掉品牌色。
+ */
+
+body {
+  /* 页面底色的 RGB 通道，用来做半透明遮罩（贴了背景图时压在图上） */
+  --app-surface-rgb: 255, 255, 255;
+  --app-wallpaper-scrim-rgb: 255, 255, 255;
+
+  --wp-aurora: linear-gradient(160deg, #dbe6ff 0%, #e4d9ff 46%, #ffdcef 100%);
+  --wp-dusk: linear-gradient(165deg, #ffe9d5 0%, #ffd8e6 48%, #e2d6ff 100%);
+  --wp-paper: linear-gradient(180deg, #f6f1e8 0%, #efe9dd 60%, #e9e2d6 100%);
+  --wp-mist: linear-gradient(160deg, #dfecea 0%, #d9e7f3 55%, #e9e3f4 100%);
+  --wp-forest: linear-gradient(160deg, #daefe0 0%, #d4e9f2 58%, #e5f1d8 100%);
+}
+
+body[data-ds-dark-theme] {
+  --app-surface-rgb: 21, 21, 23;
+  --app-wallpaper-scrim-rgb: 14, 14, 16;
+
+  --wp-aurora: linear-gradient(160deg, #0e1526 0%, #161033 46%, #241226 100%);
+  --wp-dusk: linear-gradient(165deg, #20140f 0%, #24101a 48%, #171029 100%);
+  --wp-paper: linear-gradient(180deg, #171614 0%, #131211 60%, #100f0e 100%);
+  --wp-mist: linear-gradient(160deg, #0f1717 0%, #101820 55%, #16121c 100%);
+  --wp-forest: linear-gradient(160deg, #0d1a14 0%, #0e191d 58%, #131a10 100%);
+}
+
+body[data-app-accent] {
+  --dsw-alias-brand-primary: var(--app-accent);
+  --dsw-alias-brand-text: var(--app-accent);
+  --dsw-alias-button-primary-fill: var(--app-accent);
+  --dsw-alias-button-primary-hover: var(--app-accent-hover);
+  /* 选中会话的底色与用户气泡跟着主题色走，避免蓝底配紫按钮 */
+  --dsw-alias-brand-primary-invert: var(--app-accent);
+  --dsw-specific-bubble: var(--app-accent-tint);
+  --dsw-specific-sidebar-nav-item-active-accent: var(--app-accent-tint);
+}
+
+body[data-app-accent][data-ds-dark-theme] {
+  --dsw-alias-brand-text: var(--app-accent-soft);
+  --dsw-alias-brand-primary-invert: var(--app-accent-soft);
+  --dsw-specific-bubble: var(--app-accent-tint-dark);
+  --dsw-specific-sidebar-nav-item-active-accent: var(--app-accent-tint-dark);
+}

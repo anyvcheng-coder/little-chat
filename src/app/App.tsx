@@ -134,7 +134,8 @@ export const App = () => {
         <SearchPanel />
       </div>
       <SettingsDialog />
-      <InstallHint />
+      {/* 安装引导只在首页出现：会话里顶部会压到消息，边聊边弹也很打扰 */}
+      {activeId === null ? <InstallHint /> : null}
       <Toast />
     </>
   )

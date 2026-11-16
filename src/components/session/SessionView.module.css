@@ -29,6 +29,11 @@
   margin-left: 113px;
 }
 
+/* 设了聊天背景时顶栏也跟着透出来，避免顶部一条实色横条 */
+:global(body[data-app-wallpaper]) .header {
+  background: transparent;
+}
+
 .inputContainer {
   position: sticky;
   bottom: 0;
@@ -40,12 +45,12 @@
   width: calc(var(--message-list-max-width) - 64px);
   max-width: calc(100% - 32px);
   margin: auto auto 0;
+  /* 用页面底色的 RGB 做渐隐：没设背景图时看不出来，设了以后输入框也不会压在图上 */
   background: linear-gradient(
     to bottom,
-    transparent 0%,
-    transparent 30%,
-    var(--dsw-alias-bg-base) 30%,
-    var(--dsw-alias-bg-base) 100%
+    rgba(var(--app-surface-rgb), 0) 0%,
+    rgba(var(--app-surface-rgb), 0.9) 42%,
+    rgba(var(--app-surface-rgb), 0.98) 100%
   );
 }
 
@@ -57,6 +62,44 @@
   text-align: center;
   color: var(--dsw-alias-label-tertiary);
   user-select: none;
+}
+
+/* 回到底部：贴在输入框上方，上翻阅读时出现 */
+.jump {
+  position: absolute;
+  top: -44px;
+  right: 2px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 50%;
+  background-color: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-secondary);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  outline: none;
+  transition:
+    background-color var(--ds-transition-duration) var(--ds-ease-in-out),
+    transform var(--ds-transition-duration) var(--ds-ease-in-out);
+
+  @media (hover: hover) {
+    &:hover {
+      background-color: var(--dsw-alias-interactive-bg-hover);
+    }
+  }
+
+  &:active {
+    transform: scale(0.94);
+  }
+
+  &:focus-visible {
+    box-shadow: 0 0 0 2px var(--dsw-alias-button-primary-fill);
+  }
 }
 
 @media not all and (min-width: 768px) {

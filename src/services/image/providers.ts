@@ -59,6 +59,11 @@ export type ImageProvider = {
   countField: string | null
   /** 每次请求都附带的字段（如关闭水印、要求返回 base64） */
   extraBody?: Record<string, unknown>
+  /**
+   * 手填的自定义模型 ID 没有登记参考图能力，按这里的配置处理：
+   * 该系列的新版本参数基本延续，能继续吃参考图；留空表示自定义模型只做文生图。
+   */
+  fallbackReference?: ImageReferenceSpec
   models: ImageModel[]
   defaultModel: string
   defaultSize: string
@@ -86,6 +91,20 @@ const ERNIE_SIZES: ImageSize[] = [
   { value: '1024x768', label: '4:3 横版' },
 ]
 
+/**
+ * Seedream 5.x（5.5 / 5.0 Pro / 5.0 Flash）的范围是 1K～2K，
+ * 像素值直接写各档位的映射，所以同一套尺寸在 5.x 上仍然可用。
+ */
+const SEEDREAM_5_SIZES: ImageSize[] = [
+  { value: '1024x1024', label: '1K 方形' },
+  { value: '2048x2048', label: '2K 方形' },
+  { value: '1776x2368', label: '2K 3:4 竖版' },
+  { value: '1584x2816', label: '2K 9:16 手机竖屏' },
+  { value: '2368x1776', label: '2K 4:3 横版' },
+  { value: '2816x1584', label: '2K 16:9 横屏' },
+]
+
+/** Seedream 4.x 支持到 4K */
 const SEEDREAM_SIZES: ImageSize[] = [
   { value: '2048x2048', label: '2K 方形' },
   { value: '1728x2304', label: '2K 3:4 竖版' },
@@ -113,6 +132,7 @@ export const PROVIDERS: Record<ImageProviderId, ImageProvider> = {
     countField: 'batch_size',
     // 默认返回 1 小时有效的外链，这里要求同时返回 base64，拿到后立即落盘
     extraBody: { provider: { enable_image_base64: true } },
+    fallbackReference: { max: 1, transport: 'json', fields: ['image'] },
     models: [
       {
         id: 'Kwai-Kolors/Kolors',
@@ -165,17 +185,43 @@ export const PROVIDERS: Record<ImageProviderId, ImageProvider> = {
     countField: null,
     // Seedream 默认带水印；response_format 指定直接返回 base64
     extraBody: { watermark: false, response_format: 'b64_json' },
+    // 自定义模型默认按 Seedream 系列的图生图参数发送
+    fallbackReference: { max: 10, transport: 'json', fields: ['image'], asArray: true },
     models: [
       {
-        id: 'doubao-seedream-4-0-20260415',
-        label: 'Seedream 4.0',
-        sizes: SEEDREAM_SIZES,
-        priceHint: '约 0.2 元/张',
+        id: 'doubao-seedream-5-5-261028',
+        label: 'Seedream 5.5',
+        sizes: SEEDREAM_5_SIZES,
         // image 支持字符串或数组，多图参考合并成数组
         reference: { max: 10, transport: 'json', fields: ['image'], asArray: true },
       },
+      {
+        id: 'doubao-seedream-5-0-pro-260628',
+        label: 'Seedream 5.0 Pro',
+        sizes: SEEDREAM_5_SIZES,
+        reference: { max: 10, transport: 'json', fields: ['image'], asArray: true },
+      },
+      {
+        id: 'doubao-seedream-5-0-flash-260915',
+        label: 'Seedream 5.0 Flash',
+        sizes: SEEDREAM_5_SIZES,
+        reference: { max: 10, transport: 'json', fields: ['image'], asArray: true },
+      },
+      {
+        id: 'doubao-seedream-4-5-251128',
+        label: 'Seedream 4.5（旧版）',
+        sizes: SEEDREAM_SIZES,
+        reference: { max: 14, transport: 'json', fields: ['image'], asArray: true },
+      },
+      {
+        id: 'doubao-seedream-4-0-250828',
+        label: 'Seedream 4.0（旧版）',
+        sizes: SEEDREAM_SIZES,
+        priceHint: '约 0.2 元/张',
+        reference: { max: 14, transport: 'json', fields: ['image'], asArray: true },
+      },
     ],
-    defaultModel: 'doubao-seedream-4-0-20260415',
+    defaultModel: 'doubao-seedream-5-5-261028',
     defaultSize: '2048x2048',
   },
   openai: {
@@ -187,7 +233,22 @@ export const PROVIDERS: Record<ImageProviderId, ImageProvider> = {
     corsSafe: false,
     sizeField: 'size',
     countField: 'n',
+    fallbackReference: { max: 16, transport: 'form' },
     models: [
+      {
+        id: 'gpt-image-2',
+        label: 'GPT Image 2（最新）',
+        sizes: GPT_IMAGE_SIZES,
+        priceHint: '按 token 计费，输出较贵',
+        reference: { max: 16, transport: 'form' },
+      },
+      {
+        id: 'gpt-image-1.5',
+        label: 'GPT Image 1.5',
+        sizes: GPT_IMAGE_SIZES,
+        priceHint: '比 GPT Image 1 便宜约 20%',
+        reference: { max: 16, transport: 'form' },
+      },
       {
         id: 'gpt-image-1',
         label: 'GPT Image 1',
@@ -203,7 +264,7 @@ export const PROVIDERS: Record<ImageProviderId, ImageProvider> = {
         reference: { max: 16, transport: 'form' },
       },
     ],
-    defaultModel: 'gpt-image-1',
+    defaultModel: 'gpt-image-2',
     defaultSize: '1024x1024',
   },
 }
@@ -222,11 +283,24 @@ export const getImageSizes = (provider: ImageProvider, model: string): ImageSize
   return provider.models.find((item) => item.id === provider.defaultModel)?.sizes ?? []
 }
 
-/** 模型的参考图能力；不认识的自定义模型按文生图处理 */
+/** 是否登记过的模型；false 表示用户手填的自定义模型 */
+export const isPresetImageModel = (provider: ImageProvider, model: string): boolean =>
+  provider.models.some((item) => item.id === model)
+
+/** 取模型的展示名；自定义模型直接显示 ID */
+export const getImageModelLabel = (provider: ImageProvider, model: string): string =>
+  provider.models.find((item) => item.id === model)?.label ?? model
+
+/**
+ * 模型的参考图能力。
+ * 自定义模型没有登记，按供应商的 fallbackReference 处理——同系列新版本参数通常不变，
+ * 完全不吃参考图的接口也没有这个字段，此时退化成文生图。
+ */
 export const getImageReferenceSpec = (
   provider: ImageProvider,
   model: string
-): ImageReferenceSpec | undefined => provider.models.find((item) => item.id === model)?.reference
+): ImageReferenceSpec | undefined =>
+  provider.models.find((item) => item.id === model)?.reference ?? provider.fallbackReference
 
 /** 模型是否忽略尺寸参数 */
 export const isImageSizeIgnored = (provider: ImageProvider, model: string): boolean =>
@@ -236,6 +310,7 @@ export const isImageSizeIgnored = (provider: ImageProvider, model: string): bool
  * 按参考图张数挑模型：
  * 当前模型够用就保持不变；吃不下或不吃参考图时，优先换一个能全部吃下的，
  * 都吃不下就换容量最大的；该供应商完全没有参考图模型则保留原模型（按文生图处理）。
+ * 手填的自定义模型一律不动——用户明确指定了版本，替它换模型反而会画错。
  */
 export const resolveImageModel = (
   provider: ImageProvider,
@@ -246,7 +321,10 @@ export const resolveImageModel = (
     return model
   }
   const current = provider.models.find((item) => item.id === model)
-  if (current?.reference && current.reference.max >= referenceCount) {
+  if (!current) {
+    return model
+  }
+  if (current.reference && current.reference.max >= referenceCount) {
     return model
   }
   const capable = provider.models.filter((item) => item.reference)
@@ -261,6 +339,13 @@ export const resolveImageModel = (
     (item.reference?.max ?? 0) > (best.reference?.max ?? 0) ? item : best
   ).id
 }
+
+/** 老版本写进本机设置的模型 ID 已下线或本就写错，启动时换成当前版本 */
+const LEGACY_MODEL_IDS: Record<string, string> = {
+  'doubao-seedream-4-0-20260415': 'doubao-seedream-5-5-261028',
+}
+
+export const migrateImageModel = (model: string): string => LEGACY_MODEL_IDS[model] ?? model
 
 /** 去掉末尾斜杠，允许用户填 `https://x.com/v1` 这种写法 */
 export const normalizeImageOrigin = (value: string): string =>

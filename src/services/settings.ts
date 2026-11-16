@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 import type { TtsVoice } from './api/speech.js'
-import { getImageProvider, normalizeImageOrigin, PROVIDERS } from './image/providers.js'
+import {
+  getImageProvider,
+  getImageSizes,
+  migrateImageModel,
+  normalizeImageOrigin,
+  PROVIDERS,
+} from './image/providers.js'
 import { normalizeLocation, type UserLocation } from './location.js'
 
 export type Locale = 'zh-CN' | 'en-US'
@@ -112,13 +118,22 @@ const initialImageProvider = (): string => {
 }
 
 const initialImageModel = (): string => {
-  const saved = read(KEYS.imageModel)
-  return saved?.trim() || getImageProvider(initialImageProvider()).defaultModel
+  const saved = read(KEYS.imageModel)?.trim()
+  return migrateImageModel(saved || getImageProvider(initialImageProvider()).defaultModel)
 }
 
+/** 旧模型换成新模型后，原尺寸可能超出新模型的取值范围，回落到该供应商的默认尺寸 */
 const initialImageSize = (): string => {
-  const saved = read(KEYS.imageSize)
-  return saved?.trim() || getImageProvider(initialImageProvider()).defaultSize
+  const provider = getImageProvider(initialImageProvider())
+  const saved = read(KEYS.imageSize)?.trim()
+  if (!saved) {
+    return provider.defaultSize
+  }
+  const model = initialImageModel()
+  const sizes = getImageSizes(provider, model)
+  return sizes.length > 0 && !sizes.some((item) => item.value === saved)
+    ? provider.defaultSize
+    : saved
 }
 
 /** 读取「供应商 ID → 字符串」形式的记录，脏数据一律丢掉 */

@@ -523,3 +523,18 @@ export const IconToastError16 = () => (
     />
   </svg>
 )
+
+/** 个性化设置图标：调色盘（描边 + 三个颜料点） */
+export const IconPaletteOutline16 = () => (
+  <svg width={16} height={16} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M8 1.9c-3.37 0-6.1 2.55-6.1 5.7 0 3.14 2.73 5.7 6.1 5.7.86 0 1.34-.6 1.34-1.26 0-.68-.48-1.15-1-1.49-.38-.25-.58-.53-.58-.88 0-.6.49-1.07 1.1-1.07h1.3c2.02 0 3.47-1.45 3.47-3.28C13.63 3.55 11.02 1.9 8 1.9Z"
+      stroke="currentColor"
+      strokeWidth={1.2}
+      strokeLinejoin="round"
+    />
+    <circle cx="5.5" cy="6.2" r=".95" fill="currentColor" />
+    <circle cx="8.1" cy="4.6" r=".95" fill="currentColor" />
+    <circle cx="10.6" cy="6.2" r=".95" fill="currentColor" />
+  </svg>
+)

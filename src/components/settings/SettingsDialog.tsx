@@ -6,6 +6,7 @@ import {
   IconDownloadOutline16,
   IconFollowsystemOutline16,
   IconLightOutline16,
+  IconPaletteOutline16,
   IconPhotoErrorFill20,
   IconSettingsOutline16,
   IconUploadOutline14,
@@ -34,6 +35,7 @@ import { Modal } from '../base/Modal.js'
 import { Select } from '../base/Select.js'
 import { showToast } from '../base/toastState.js'
 import { ApiKeyConfirm, ApiKeyField, useApiKeyEditor } from './ApiKeyField.js'
+import { AppearanceSettings } from './AppearanceSettings.js'
 import { ImageSettings } from './ImageSettings.js'
 import { closeSettings, useSettingsDialog, type SettingsSection } from './settingsDialogState.js'
 import styles from './Settings.module.css'
@@ -52,6 +54,11 @@ const sections: { value: SettingsSection; label: TranslationKey; icon: ReactNode
     value: 'general',
     label: 'settingDialogAsideGeneralOptionLabel',
     icon: <IconSettingsOutline16 />,
+  },
+  {
+    value: 'appearance',
+    label: 'settingDialogAsideAppearanceOptionLabel',
+    icon: <IconPaletteOutline16 />,
   },
   {
     value: 'image',
@@ -108,6 +115,8 @@ const SettingsContent = () => {
               <TtsVoiceSetting />
               <LocationSetting />
             </>
+          ) : section === 'appearance' ? (
+            <AppearanceSettings />
           ) : section === 'image' ? (
             <ImageSettings />
           ) : (

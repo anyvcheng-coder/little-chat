@@ -20,6 +20,26 @@
   min-height: 0;
 }
 
+/* 聊天背景：只铺在对话区域，侧边栏与顶栏保持原色。遮罩用页面底色调，深浅色都自然 */
+:global(body[data-app-wallpaper]) .content::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image:
+    linear-gradient(
+      rgba(var(--app-wallpaper-scrim-rgb), var(--app-wallpaper-dim, 0.62)),
+      rgba(var(--app-wallpaper-scrim-rgb), var(--app-wallpaper-dim, 0.62))
+    ),
+    var(--app-wallpaper);
+  background-position: center;
+  background-size: cover;
+  filter: blur(var(--app-wallpaper-blur, 0px));
+  /* 放大一点，模糊后四周不会露出底色边 */
+  transform: scale(1.06);
+  pointer-events: none;
+}
+
 .saveError {
   display: flex;
   align-items: center;

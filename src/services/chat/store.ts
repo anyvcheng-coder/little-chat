@@ -1158,13 +1158,14 @@ const drawImagePart = async (
   }
   const { imageProvider, imageModel, imageSize } = useSettings.getState()
   const provider = getImageProvider(imageProvider)
-  const model = provider.models.some((item) => item.id === part.model)
-    ? part.model
-    : imageModel || provider.defaultModel
+  // 同一供应商下块里记的模型就是权威值（可能是用户手填的自定义模型）；换过供应商才回落到当前设置
+  const model =
+    part.provider === provider.id && part.model ? part.model : imageModel || provider.defaultModel
   const sizes = getImageSizes(provider, model)
+  // 空串表示「尺寸由服务端决定」
   const size = isImageSizeIgnored(provider, model)
     ? ''
-    : sizes.some((item) => item.value === part.size)
+    : part.size === '' || sizes.some((item) => item.value === part.size)
       ? part.size
       : sizes.some((item) => item.value === imageSize)
         ? imageSize

@@ -102,3 +102,20 @@
   gap: 8px;
   margin: 6px 10px 10px;
 }
+
+@media not all and (min-width: 768px) {
+  /* 触屏没有 hover：复制、编辑这些操作不能只在最后一条出现，否则翻回去就点不到 */
+  .actions {
+    gap: 6px;
+    opacity: 1;
+  }
+
+  .actions button {
+    min-width: 36px;
+    min-height: 36px;
+  }
+
+  .bottom {
+    height: 36px;
+  }
+}

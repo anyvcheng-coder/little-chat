@@ -5,6 +5,7 @@ import {
   getImageProvider,
   getImageSizes,
   IMAGE_PROVIDER_IDS,
+  isPresetImageModel,
   PROVIDERS,
 } from '../../services/image/providers.js'
 import {
@@ -20,9 +21,13 @@ import { IconButton } from '../base/IconButton.js'
 import { Select } from '../base/Select.js'
 import styles from './Settings.module.css'
 
+/** 模型下拉里的「自定义」占位值，不会写进设置 */
+const CUSTOM_MODEL = 'custom'
+
 /**
  * 图片生成设置：生图服务的 API Key、接口地址与默认模型、尺寸。
  * Key 按供应商分别保存，切换供应商不会把 A 家的 Key 发给 B 家。
+ * 模型列表只是常用版本的快捷入口，厂商出新版时可以直接填模型 ID，不用等改代码。
  * Key 不做在线校验——多数生图接口没有免费的校验端点，只能真正出一次图才知道对不对。
  */
 export const ImageSettings = () => {
@@ -36,33 +41,37 @@ export const ImageSettings = () => {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const [baseDraft, setBaseDraft] = useState(baseUrls[providerId] ?? '')
+  /** 手动填写模型 ID 的模式；已保存的是自定义模型时也保持展开 */
+  const [customModel, setCustomModel] = useState(false)
+  const [modelDraft, setModelDraft] = useState('')
 
   const apiKey = apiKeys[providerId] ?? ''
   const saved = !!apiKey
+  const preset = isPresetImageModel(provider, model)
   const sizes = getImageSizes(provider, model)
-  const modelOptions = provider.models.some((item) => item.id === model)
-    ? provider.models.map((item) => ({
-        value: item.id,
-        label: item.reference
-          ? `${item.label} · ${t('imageModelReferenceTag')}`
-          : item.label,
-      }))
-    : [
-        { value: model, label: model },
-        ...provider.models.map((item) => ({
-          value: item.id,
-          label: item.reference ? `${item.label} · ${t('imageModelReferenceTag')}` : item.label,
-        })),
-      ]
-  const sizeOptions = sizes.some((item) => item.value === size)
-    ? sizes.map((item) => ({ value: item.value, label: item.label }))
-    : [{ value: size, label: size }, ...sizes.map((item) => ({ value: item.value, label: item.label }))]
+  const currentModel = provider.models.find((item) => item.id === model)
+  const showModelInput = customModel || !preset
+  const modelOptions = [
+    ...(preset ? [] : [{ value: model, label: model }]),
+    ...provider.models.map((item) => ({
+      value: item.id,
+      label: item.reference ? `${item.label} · ${t('imageModelReferenceTag')}` : item.label,
+    })),
+    { value: CUSTOM_MODEL, label: t('imageModelCustom') },
+  ]
+  // 尺寸留空表示不传 size，由服务端按提示词决定
+  const sizeOptions = [
+    { value: '', label: t('imageSizeAuto') },
+    ...sizes.map((item) => ({ value: item.value, label: item.label })),
+  ]
 
   // 切换供应商后，输入框要跟着换成该供应商已保存的内容
   useEffect(() => {
     setEditing(false)
     setDraft('')
     setBaseDraft(baseUrls[providerId] ?? '')
+    setCustomModel(false)
+    setModelDraft('')
   }, [providerId, baseUrls])
 
   const save = () => {
@@ -79,6 +88,16 @@ export const ImageSettings = () => {
     if (baseDraft.trim() !== (baseUrls[providerId] ?? '')) {
       setImageBaseUrl(providerId, baseDraft)
     }
+  }
+
+  const saveModel = () => {
+    const value = modelDraft.trim()
+    if (!value) {
+      return
+    }
+    setImageModel(value)
+    setModelDraft('')
+    setCustomModel(false)
   }
 
   return (
@@ -176,19 +195,63 @@ export const ImageSettings = () => {
       <div className={clsx(styles.cell, styles.row)}>
         <div className={styles.text}>
           <div className={styles.label}>{t('imageModelLabel')}</div>
-          {provider.models.find((item) => item.id === model)?.priceHint ? (
-            <div className={styles.description}>
-              {provider.models.find((item) => item.id === model)?.priceHint}
-            </div>
+          {currentModel?.priceHint ? (
+            <div className={styles.description}>{currentModel.priceHint}</div>
+          ) : !preset ? (
+            <div className={styles.description}>{t('imageModelCustomInUse')}</div>
           ) : null}
         </div>
         <Select
           ariaLabel={t('imageModelLabel')}
-          value={model}
+          value={showModelInput ? CUSTOM_MODEL : model}
           options={modelOptions}
-          onChange={setImageModel}
+          onChange={(value) => {
+            if (value === CUSTOM_MODEL) {
+              setModelDraft(preset ? '' : model)
+              setCustomModel(true)
+              return
+            }
+            setCustomModel(false)
+            setImageModel(value)
+          }}
         />
       </div>
+      {showModelInput ? (
+        <div className={styles.cell}>
+          <div className={styles.apiKey}>
+            <div className={styles.label}>{t('imageModelCustomLabel')}</div>
+            <div className={styles.apiKeyInput}>
+              <input
+                type="text"
+                placeholder={provider.models[0]?.id ?? ''}
+                autoComplete="off"
+                spellCheck={false}
+                value={modelDraft}
+                onChange={(event) => setModelDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                    saveModel()
+                  }
+                }}
+              />
+              {modelDraft.trim() ? (
+                <>
+                  <span className={styles.divider} />
+                  <button
+                    type="button"
+                    className={styles.confirm}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={saveModel}
+                  >
+                    {t('confirm')}
+                  </button>
+                </>
+              ) : null}
+            </div>
+            <div className={styles.description}>{t('imageModelCustomHint')}</div>
+          </div>
+        </div>
+      ) : null}
       <div className={clsx(styles.cell, styles.row)}>
         <div className={styles.text}>
           <div className={styles.label}>{t('imageSizeLabel')}</div>

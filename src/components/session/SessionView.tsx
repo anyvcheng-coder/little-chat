@@ -2,6 +2,7 @@ import clsx from 'clsx'
 import { useIsMobile } from '../../app/viewport.js'
 import { useTranslate } from '../../i18n/index.js'
 import type { Session } from '../../services/chat/types.js'
+import { IconChevronDownOutline14 } from '../base/icons.js'
 import { ChatInput } from '../chatInput/ChatInput.js'
 import { MessageList } from '../messages/MessageList.js'
 import { MobileHeader } from './MobileHeader.js'
@@ -34,12 +35,23 @@ export const SessionView = ({
       <MessageList
         session={session}
         streaming={streaming}
-        footer={
+        footer={({ atBottom, jump }) => (
           <div className={styles.inputContainer}>
+            {atBottom ? null : (
+              <button
+                type="button"
+                className={styles.jump}
+                aria-label={t('scrollToBottom')}
+                title={t('scrollToBottom')}
+                onClick={jump}
+              >
+                <IconChevronDownOutline14 />
+              </button>
+            )}
             <ChatInput sessionId={session.id} />
             <div className={styles.caveat}>{t('contentCaveat')}</div>
           </div>
-        }
+        )}
       />
     </div>
   )

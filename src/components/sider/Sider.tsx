@@ -92,7 +92,15 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
         </div>
       </div>
       <div className={styles.bottom}>
-        <button type="button" className={styles.settings} onClick={() => openSettings('general')}>
+        <button
+          type="button"
+          className={styles.settings}
+          onClick={() => {
+            // 移动端先进抽屉才能点到这里；打开设置时把抽屉收掉，关掉设置后不会又回到抽屉
+            closeMobileSider()
+            openSettings('general')
+          }}
+        >
           <span className={styles.settingsIcon}>
             <IconSettingsOutline16 />
           </span>

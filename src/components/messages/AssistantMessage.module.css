@@ -137,3 +137,16 @@
     --search-row-site-logo-color: var(--dsw-alias-interactive-bg-hover);
   }
 }
+
+@media not all and (min-width: 768px) {
+  /* 同上：手机上所有回答的操作区都常显，并把点击区域撑到 36px */
+  .actions {
+    gap: 6px;
+    opacity: 1;
+  }
+
+  .actions button {
+    min-width: 36px;
+    min-height: 36px;
+  }
+}

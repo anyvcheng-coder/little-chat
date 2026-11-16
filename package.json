@@ -1,6 +1,6 @@
 {
   "name": "little-chat",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "对话式 AI 助手：边聊边生图，支持参考图改图。",
   "license": "MIT",
   "private": true,

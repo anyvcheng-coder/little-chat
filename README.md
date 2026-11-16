@@ -75,12 +75,14 @@ pnpm icons
 - Streaming replies, deep thinking, smart search, link reading, and source citations; stop generation or continue eligible replies.
 - Upload, paste, or drag and drop attachments; use voice input and read replies aloud. A live audio spectrum appears in the first row of the input area while recording on mobile.
 - Markdown, syntax highlighting, KaTeX math, and Mermaid diagrams.
-- Image generation: the chat model writes the prompt, then hands it off to an image API; results stay in the conversation with the prompt, model, and reference images, and can be regenerated after editing the prompt.
-- Simplified Chinese and English, light and dark themes, mobile layouts, location settings, and chat history import and export.
+- Image generation: the chat model writes the prompt, then hands it off to an image API; results stay in the conversation with the prompt, model, and reference images, and can be regenerated after editing the prompt. Common models are built in (Volcengine Ark Seedream 5.5 / 5.0, OpenAI GPT Image 2 / 1.5, ...), and you can type any model ID to use a release that ships before the app updates.
+- Simplified Chinese and English, light and dark themes, an accent color and chat background (preset gradients or your own image, with adjustable dim and blur), mobile layouts, location settings, and chat history import and export.
 
 ## Data and storage
 
 Your API key and settings are stored in the browser's localStorage. Conversations and original attachments are stored in IndexedDB. Local data is isolated by browser profile and site origin. Sending messages, uploading attachments, and using speech features sends the relevant content to the configured API service.
+
+The accent color and chat background (including an uploaded image, downscaled to a 1440px long edge before saving) live only in this device's localStorage; they are not part of the exported history, so a new device starts with the defaults.
 
 History import and export in Settings use ZIP archives. After confirmation and successful validation, importing replaces all local conversations and attachments. Exports include conversations and locally available original images, but exclude API keys, settings, and original non-image attachments. See the [history import/export documentation (Chinese)](src/services/chat/history/README.md) for the archive format and preservation details.
 

@@ -1,5 +1,5 @@
 import type { ImageProvider, ImageReferenceSpec } from '../image/providers.js'
-import { isImageSizeIgnored } from '../image/providers.js'
+import { getImageReferenceSpec, isImageSizeIgnored } from '../image/providers.js'
 import { prepareReference, toDataUrl } from '../image/references.js'
 import { ApiError } from './client.js'
 
@@ -130,7 +130,8 @@ export const generateImages = async (
   { provider, apiKey, baseUrl, model, prompt, size, n, references = [] }: GenerateImagesOptions,
   signal: AbortSignal
 ): Promise<Blob[]> => {
-  const spec = provider.models.find((item) => item.id === model)?.reference
+  // 手填的自定义模型走供应商的 fallbackReference，仍可带参考图
+  const spec = getImageReferenceSpec(provider, model)
   // 参考图只在模型声明支持时使用；否则按文生图提交，避免接口报“未知字段”
   const usable = spec ? references.slice(0, spec.max) : []
   const prepared = await Promise.all(usable.map((blob) => prepareReference(blob)))

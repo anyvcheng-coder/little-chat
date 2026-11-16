@@ -33,6 +33,12 @@ import styles from './MessageList.module.css'
 const STICKY_THRESHOLD = 40
 const EMPTY_VERSIONS: MessageVersions = { ids: [], index: -1 }
 
+/** 底部区域需要的滚动状态：是否贴底、以及跳回底部的动作 */
+export type MessageListFooter = {
+  atBottom: boolean
+  jump: () => void
+}
+
 export const MessageList = ({
   session,
   streaming,
@@ -40,7 +46,7 @@ export const MessageList = ({
 }: {
   session: Session
   streaming: boolean
-  footer: React.ReactNode
+  footer: (state: MessageListFooter) => React.ReactNode
 }) => {
   const isMobile = useIsMobile()
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -48,6 +54,8 @@ export const MessageList = ({
   const stickyRef = useRef(true)
   const scrollTopRef = useRef(0)
   const restoreScrollRef = useRef<{ messageId: string; top: number } | null>(null)
+  // 用户往上翻时显示「回到底部」，否则流式输出期间很难回到最新内容
+  const [atBottom, setAtBottom] = useState(true)
   const messages = getVisibleMessages(session)
   const [previousVersions, setPreviousVersions] = useState(() =>
     buildMessageVersions(session, new Map())
@@ -65,6 +73,17 @@ export const MessageList = ({
     if (el && stickyRef.current) {
       el.scrollTop = el.scrollHeight
       scrollTopRef.current = el.scrollTop
+    }
+  }, [])
+
+  /** 手动回到底部：重新进入跟随状态，流式内容继续自动滚动 */
+  const jumpToBottom = useCallback(() => {
+    stickyRef.current = true
+    setAtBottom(true)
+    const el = scrollRef.current
+    if (el) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+      scrollTopRef.current = el.scrollHeight
     }
   }, [])
 
@@ -96,6 +115,7 @@ export const MessageList = ({
       return
     }
     stickyRef.current = true
+    setAtBottom(true)
     scrollToBottom()
   }, [session.id, lastMessageId, scrollToBottom])
 
@@ -134,6 +154,7 @@ export const MessageList = ({
         stickyRef.current = false
       }
       scrollTopRef.current = el.scrollTop
+      setAtBottom(nearBottom)
     }
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => el.removeEventListener('scroll', onScroll)
@@ -174,7 +195,7 @@ export const MessageList = ({
             )}
           </div>
         </div>
-        {footer}
+        {footer({ atBottom, jump: jumpToBottom })}
       </div>
     </ScrollToBottomContext.Provider>
   )
