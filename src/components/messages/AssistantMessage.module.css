@@ -118,6 +118,9 @@
   font-variant-numeric: tabular-nums;
   cursor: pointer;
   user-select: none;
+  /* 虚线下划线暗示可以点开看明细 */
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
 
   &:hover {
     color: var(--dsw-alias-label-secondary);

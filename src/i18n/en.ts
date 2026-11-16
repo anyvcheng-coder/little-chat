@@ -277,5 +277,7 @@ export const en = {
   libraryOpenSession: 'Open chat',
   messageUsageDetail: 'This request: {input} input ({cached} cached), {output} output, about {cost}',
   usageTotalLabel: 'Usage on this device',
-  usageTotalDetail: '{requests} requests · {tokens} tokens · about {cost}',
+  usageTotalDetail: '{requests} requests · {tokens} tokens ({cached} cached) · about {cost}',
+  usageBreakdown: 'Input {miss} · cached {cached} · output {output}, hit rate {rate}%',
+  usageNoCache: 'No cache hits at all — every input token billed at full price',
 } satisfies Record<keyof typeof zh, string>

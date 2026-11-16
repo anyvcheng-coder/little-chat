@@ -463,7 +463,14 @@ const SettingCell = ({
  */
 const UsageSummary = () => {
   const t = useTranslate()
-  const [total, setTotal] = useState<{ requests: number; tokens: number; cost: number } | null>(null)
+  const [total, setTotal] = useState<{
+    requests: number
+    tokens: number
+    miss: number
+    cached: number
+    output: number
+    cost: number
+  } | null>(null)
   useEffect(() => {
     let alive = true
     loadAllSessions()
@@ -473,6 +480,9 @@ const UsageSummary = () => {
         }
         let requests = 0
         let tokens = 0
+        let miss = 0
+        let cached = 0
+        let output = 0
         let cost = 0
         for (const session of sessions) {
           for (const message of session.messages) {
@@ -481,10 +491,13 @@ const UsageSummary = () => {
             }
             requests += 1
             tokens += totalTokens(message.usage)
+            miss += message.usage.input_tokens + message.usage.cache_creation_input_tokens
+            cached += message.usage.cache_read_input_tokens
+            output += message.usage.output_tokens
             cost += estimateCost(message.usage, message.createdAt)
           }
         }
-        setTotal({ requests, tokens, cost })
+        setTotal({ requests, tokens, miss, cached, output, cost })
       })
       .catch(() => setTotal(null))
     return () => {
@@ -494,19 +507,40 @@ const UsageSummary = () => {
   if (!total || total.requests === 0) {
     return null
   }
+  // 缓存命中率决定输入侧的真实单价：全未命中约 1.5 元/百万，全命中只要 0.05 元
+  const rate = Math.round((total.cached / Math.max(1, total.miss + total.cached)) * 100)
   return (
-    <div className={clsx(styles.cell, styles.row)}>
-      <div className={styles.text}>
-        <div className={styles.label}>{t('usageTotalLabel')}</div>
-        <div className={styles.description}>
+    <button
+      type="button"
+      className={clsx(styles.cell, styles.row, styles.usageRow)}
+      onClick={() =>
+        showToast(
+          total.cached > 0
+            ? {
+                key: 'usageBreakdown',
+                params: {
+                  miss: formatTokens(total.miss),
+                  cached: formatTokens(total.cached),
+                  output: formatTokens(total.output),
+                  rate,
+                },
+              }
+            : { key: 'usageNoCache' }
+        )
+      }
+    >
+      <span className={styles.text}>
+        <span className={styles.label}>{t('usageTotalLabel')}</span>
+        <span className={styles.description}>
           {t('usageTotalDetail', {
             requests: total.requests,
             tokens: formatTokens(total.tokens),
+            cached: formatTokens(total.cached),
             cost: formatCost(total.cost),
           })}
-        </div>
-      </div>
-    </div>
+        </span>
+      </span>
+    </button>
   )
 }
 

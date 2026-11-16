@@ -267,5 +267,7 @@ export const zh = {
   libraryOpenSession: '查看原会话',
   messageUsageDetail: '本次请求：输入 {input}（缓存命中 {cached}），输出 {output}，估算 {cost}',
   usageTotalLabel: '本机累计用量',
-  usageTotalDetail: '{requests} 次请求 · {tokens} tokens · 约 {cost}',
+  usageTotalDetail: '{requests} 次请求 · {tokens} tokens（缓存命中 {cached}）· 约 {cost}',
+  usageBreakdown: '输入 {miss} · 缓存命中 {cached} · 输出 {output}，命中率 {rate}%',
+  usageNoCache: '缓存一个 token 都没命中，输入全按原价计费',
 } as const

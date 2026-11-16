@@ -7,6 +7,7 @@ declare const styles: {
   readonly "content": string;
   readonly "cell": string;
   readonly "row": string;
+  readonly "usageRow": string;
   readonly "text": string;
   readonly "label": string;
   readonly "uploadButton": string;
