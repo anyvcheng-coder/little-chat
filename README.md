@@ -31,13 +31,18 @@ The output is written to `dist/`. Deploy it to a static web server or open `dist
 
 ### Android APK (recommended)
 
-GitHub Actions builds the APK on every push to `main` and refreshes the same release:
-
 **[Download the latest APK](https://github.com/anyvcheng-coder/little-chat/releases/latest/download/little-chat.apk)**
 
 Open that link on the phone and allow "install unknown apps". It is a debug-signed build for personal use, not a store release; enter your API key and image settings on first launch, and everything stays on the device.
 
-To change the Android project itself you can either run `npx cap open android` with Android Studio installed, or edit the files under [android/](android/) and let CI produce the APK.
+Rebuild it locally (JDK 21 and Android SDK 36, or open [android/](android/) in Android Studio):
+
+```sh
+pnpm build && npx cap sync android
+cd android && ./gradlew assembleDebug     # output in app/build/outputs/apk/debug/
+```
+
+The GitHub Actions build lives in [ci/android-apk.yml](ci/android-apk.yml): copy it to `.github/workflows/android.yml` and every push to `main` refreshes the release above. It sits in `ci/` because creating files under `.github/workflows/` needs a token with the `workflow` scope (`gh auth refresh -s workflow`); adding the file through the GitHub web UI works too.
 
 ### As a PWA
 
@@ -50,7 +55,7 @@ pnpm build && pnpm preview          # serve on port 8090 to try installing in a 
 ```
 
 - Host `dist/` on any static host (GitHub Pages, Cloudflare Pages, Vercel, ...) and open that URL on the phone.
-- The repo ships [.github/workflows/pages.yml](.github/workflows/pages.yml); pushing `main` publishes to GitHub Pages.
+- To host on GitHub Pages, copy [ci/pages.yml](ci/pages.yml) to `.github/workflows/pages.yml` (same `workflow` scope requirement); pushing `main` then publishes automatically.
 
 How to install: on Android Chrome, open the menu → "Install app", or wait for the in-page "Add to Home Screen" hint; on iOS Safari, tap Share → "Add to Home Screen". The hint shows once per device — clear site data or run `localStorage.removeItem('installHintDismissed')` to see it again.
 

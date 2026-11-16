@@ -31,13 +31,18 @@ pnpm build
 
 ### 安卓安装包（推荐）
 
-仓库用 GitHub Actions 自动构建 APK，推到 `main` 就会更新同一个发布：
-
 **[下载 latest APK](https://github.com/anyvcheng-coder/little-chat/releases/latest/download/little-chat.apk)**
 
 手机浏览器打开上面的链接直接下载，安装时允许「安装未知来源应用」即可。这是 debug 签名的自用包，不上应用商店；首次打开在设置里填 API Key 和生图接口，之后所有会话与图片都存在手机本地。
 
-本地要改安卓工程，需要装 Android Studio 后 `npx cap open android`；不想装也能直接改 [android/](android/) 下的文件，让 CI 出包。
+重新出包（本机需要 JDK 21 与 Android SDK 36，或用 Android Studio 打开 [android/](android/)）：
+
+```sh
+pnpm build && npx cap sync android
+cd android && ./gradlew assembleDebug     # 产物在 app/build/outputs/apk/debug/
+```
+
+GitHub Actions 的自动构建写在 [ci/android-apk.yml](ci/android-apk.yml)：把它复制到 `.github/workflows/android.yml` 后，每次推 `main` 都会重新构建并更新上面这个发布。放在 `ci/` 是因为创建 `.github/workflows/` 下的文件需要带 `workflow` 权限的 token（`gh auth refresh -s workflow`），网页端新建文件同样可以。
 
 ### 装成 PWA
 
@@ -50,7 +55,7 @@ pnpm build && pnpm preview          # 本机 8090 端口预览，可在电脑浏
 ```
 
 - 放到任意静态托管（GitHub Pages、Cloudflare Pages、Vercel 等），手机浏览器打开该地址。
-- 仓库自带 [.github/workflows/pages.yml](.github/workflows/pages.yml)，推到 GitHub 的 `main` 分支即可自动发布到 Pages。
+- 想用 GitHub Pages 托管：把 [ci/pages.yml](ci/pages.yml) 复制到 `.github/workflows/pages.yml`（同上，需要 `workflow` 权限），推到 `main` 即自动发布。
 
 装法：Android Chrome 打开右上角菜单 →「安装应用」，或等页面上的「添加到主屏幕」提示；iOS Safari 点底部「分享」→「添加到主屏幕」。关掉提示后不再出现，想再看一次可清除站点数据或在控制台执行 `localStorage.removeItem('installHintDismissed')`。
 
