@@ -1,7 +1,12 @@
 import { create } from 'zustand'
 import { createId } from '../../utils/id.js'
 import { ApiError, streamMessage } from '../api/client.js'
-import { classifyStatus, extractFileIds, getFileErrorCode, isRetryableApiError } from '../api/errors.js'
+import {
+  classifyStatus,
+  extractFileIds,
+  getFileErrorCode,
+  isRetryableApiError,
+} from '../api/errors.js'
 import { generateImages } from '../api/image.js'
 import type { ChatModel, ClientTool, CreateMessageRequest } from '../api/types.js'
 import { cancelUpload, describeUploadError, uploadAttachment, useUploads } from '../attachments.js'
@@ -13,6 +18,7 @@ import {
   resolveImageModel,
 } from '../image/providers.js'
 import { getImageApiKey, getImageBaseUrl, hasImageKey, useSettings } from '../settings.js'
+import { rememberImages } from '../media.js'
 import { appendBranch, getVisibleMessages, normalizeSession, selectVersion } from './branches.js'
 import * as db from './db.js'
 import {
@@ -652,6 +658,22 @@ export const sendMessage = (targetSessionId: string | null) => {
     ])
   }
   persist(sessionId)
+  // 发出去的图片进素材库，随时可以回看或当参考图再用
+  rememberImages(
+    files
+      .filter((file) => file.isImage)
+      .map((file) => ({
+        item: {
+          id: file.id,
+          kind: 'upload' as const,
+          createdAt: now,
+          sessionId,
+          messageId: question.id,
+          name: file.name,
+        },
+        blob: file.blob,
+      }))
+  )
   clearSentDraft(targetSessionId)
   void streamReply(sessionId, reply, { history, question })
   return true
@@ -1196,16 +1218,31 @@ const drawImagePart = async (
     // 与用户上传的附件走同一条落盘通道：persist 时一起写进 files 表
     const stored = blobs.map((blob) => ({ id: createId(), blob }))
     pendingFiles.set(sessionId, [...(pendingFiles.get(sessionId) ?? []), ...stored])
+    const finishedAt = Date.now()
     const next = patchImagePart(reply, index, {
       ...target,
       status: 'done',
-      endedAt: Date.now(),
+      endedAt: finishedAt,
       images: stored.map(({ id }) => ({ fileId: id })),
       error: undefined,
     })
     updateReply(sessionId, next)
     flush()
     persist(sessionId)
+    // 出图后立刻进素材库：原件与缩略图一起落盘，后面翻素材库不用再解码原图
+    rememberImages(
+      stored.map(({ id, blob }) => ({
+        item: {
+          id,
+          kind: 'generated' as const,
+          createdAt: finishedAt,
+          sessionId,
+          messageId: reply.id,
+          prompt: part.prompt,
+        },
+        blob,
+      }))
+    )
     return next
   } catch (error) {
     const aborted = signal.aborted

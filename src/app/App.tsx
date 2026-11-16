@@ -16,6 +16,7 @@ import { MobileHeader } from '../components/session/MobileHeader.js'
 import { Welcome } from '../components/session/Welcome.js'
 import { ensureApiKey } from '../components/settings/settingsDialogState.js'
 import { SettingsDialog } from '../components/settings/SettingsDialog.js'
+import { MediaLibrary } from '../components/library/MediaLibrary.js'
 import { Toast } from '../components/base/Toast.js'
 import { showToast } from '../components/base/toastState.js'
 import { InstallHint } from '../components/pwa/InstallHint.js'
@@ -23,7 +24,7 @@ import { onUploadNotice } from '../services/attachments.js'
 import { Button } from '../components/base/Button.js'
 import { stopReadAloud } from '../services/speech/readAloud.js'
 import { CollapsedSider } from '../components/sider/CollapsedSider.js'
-import { closeMobileSider } from '../components/sider/mobileSiderState.js'
+import { closeMobileSider, useMobileSider } from '../components/sider/mobileSiderState.js'
 import { MobileSider, Sider } from '../components/sider/Sider.js'
 import styles from './App.module.css'
 
@@ -50,6 +51,8 @@ export const App = () => {
     state.activeId === null ? false : Object.hasOwn(state.streaming, state.activeId)
   )
   const activeId = useChatStore((state) => state.activeId)
+  // 安装引导固定在顶部；移动端抽屉展开时先让位，避免压住「开启新对话」与素材库入口
+  const mobileSiderOpen = useMobileSider((state) => state.open)
 
   usePreventPageScroll(isMobile)
 
@@ -134,8 +137,9 @@ export const App = () => {
         <SearchPanel />
       </div>
       <SettingsDialog />
+      <MediaLibrary />
       {/* 安装引导只在首页出现：会话里顶部会压到消息，边聊边弹也很打扰 */}
-      {activeId === null ? <InstallHint /> : null}
+      {activeId === null && !mobileSiderOpen ? <InstallHint /> : null}
       <Toast />
     </>
   )

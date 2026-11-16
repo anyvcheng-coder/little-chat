@@ -2,10 +2,34 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import { toSessionSummary, type Session, type SessionSummary } from './types.js'
 
 /** IndexedDB 存储结构版本；新增或调整存储、索引时递增。 */
-const DB_VERSION = 11
+const DB_VERSION = 12
 
 /** 文件原件按附件的本地 id 存储，所有引用同一 id 的消息共用一份；用于缩略图、打开查看，以及没有 serverId 时补传。 */
 export type StoredFile = {
+  id: string
+  blob: Blob
+}
+
+/**
+ * 素材库条目：会话里出现过的图片按原件 id 登记一份，不复制图片本身。
+ * 删除会话时一起清理，因此素材库始终等于「现有历史里的图片」。
+ */
+export type MediaItem = {
+  /** 与 files 表同一个 id */
+  id: string
+  /** upload：用户上传的附件；generated：生图模型产出的图 */
+  kind: 'upload' | 'generated'
+  createdAt: number
+  sessionId: string
+  messageId: string
+  /** 上传时的原始文件名 */
+  name?: string
+  /** 生成这张图时用的提示词 */
+  prompt?: string
+}
+
+/** 素材库缩略图：列表里只加载小图，点开大图时再读原件 */
+export type MediaThumb = {
   id: string
   blob: Blob
 }
@@ -23,6 +47,13 @@ interface ChatDB extends DBSchema {
   }
   /** 当前使用的文件原件 */
   files: { key: string; value: StoredFile }
+  /** 素材库索引，按原件 id 去重 */
+  media: {
+    key: string
+    value: MediaItem
+    indexes: { createdAt: number; sessionId: string }
+  }
+  mediaThumbs: { key: string; value: MediaThumb }
   /**
    * 历史导入的暂存：导入过程中会话与原件只写入这两个存储，`sessions` / `files` 保持不变；
    * 全部校验通过后在一个事务中替换正式数据并清空暂存，失败时只清空暂存。
@@ -43,16 +74,57 @@ const storedSummary = (session: Session): StoredSessionSummary => ({
           : message.blocks.flatMap((block) =>
               // 生成的图片与参考图共用 files 表，这里一起登记引用，删除会话时才能回收原件
               block.type === 'image'
-                ? [
-                    ...block.images.map((image) => image.fileId),
-                    ...(block.referenceFileIds ?? []),
-                  ]
+                ? [...block.images.map((image) => image.fileId), ...(block.referenceFileIds ?? [])]
                 : []
             )
       )
     ),
   ],
 })
+
+/**
+ * 从会话里抽出图片清单：用户上传的图片按提问时间，生成图按出图完成时间。
+ * 同一张图既被上传又当参考图时只登记一次，因此素材库按原件 id 去重。
+ */
+export const collectSessionMedia = (session: Session): MediaItem[] => {
+  const items = new Map<string, MediaItem>()
+  for (const message of session.messages) {
+    if (message.role === 'user') {
+      for (const file of message.files) {
+        if (file.isImage && !items.has(file.id)) {
+          items.set(file.id, {
+            id: file.id,
+            kind: 'upload',
+            createdAt: message.createdAt,
+            sessionId: session.id,
+            messageId: message.id,
+            name: file.name,
+          })
+        }
+      }
+      continue
+    }
+    for (const block of message.blocks) {
+      if (block.type !== 'image') {
+        continue
+      }
+      const createdAt = block.endedAt ?? block.startedAt ?? message.createdAt
+      for (const image of block.images) {
+        if (!items.has(image.fileId)) {
+          items.set(image.fileId, {
+            id: image.fileId,
+            kind: 'generated',
+            createdAt,
+            sessionId: session.id,
+            messageId: message.id,
+            prompt: block.prompt,
+          })
+        }
+      }
+    }
+  }
+  return [...items.values()]
+}
 
 const abortTransaction = (tx: { abort(): void }) => {
   try {
@@ -65,7 +137,7 @@ const abortTransaction = (tx: { abort(): void }) => {
 // 每个操作拿到连接后立即创建事务；IndexedDB 按创建顺序执行范围重叠的事务，读取总能看到之前发起的写入。
 const getDB = () =>
   (dbPromise ??= openDB<ChatDB>('chat-demo', DB_VERSION, {
-    upgrade(db, _oldVersion, _newVersion, tx) {
+    async upgrade(db, oldVersion, _newVersion, tx) {
       // 初始化当前格式需要的存储与索引，不迁移旧消息。
       for (const name of ['sessions', 'files', 'sessionsStaging', 'filesStaging'] as const) {
         if (!db.objectStoreNames.contains(name)) {
@@ -77,6 +149,24 @@ const getDB = () =>
         : db.createObjectStore('sessionSummaries', { keyPath: 'id' })
       if (!summaries.indexNames.contains('fileIds')) {
         summaries.createIndex('fileIds', 'fileIds', { multiEntry: true })
+      }
+      if (!db.objectStoreNames.contains('media')) {
+        const media = db.createObjectStore('media', { keyPath: 'id' })
+        media.createIndex('createdAt', 'createdAt')
+        media.createIndex('sessionId', 'sessionId')
+      }
+      if (!db.objectStoreNames.contains('mediaThumbs')) {
+        db.createObjectStore('mediaThumbs', { keyPath: 'id' })
+      }
+      // 从旧版本升级时补一份素材索引，之前聊过的图片也能出现在素材库里
+      if (oldVersion < 12) {
+        const sessions = await tx.objectStore('sessions').getAll()
+        const media = tx.objectStore('media')
+        for (const session of sessions) {
+          for (const item of collectSessionMedia(session)) {
+            await media.put(item)
+          }
+        }
       }
     },
   }).catch((error: unknown) => {
@@ -133,9 +223,12 @@ export const renameSession = async (id: string, title: string): Promise<void> =>
   ])
 }
 
-/** 删除会话，仅清理已无会话引用的本地原件；远端文件不删。 */
+/** 删除会话，仅清理已无会话引用的本地原件；远端文件不删。素材库条目随会话一起清掉。 */
 export const deleteSession = async (sessionId: string): Promise<void> => {
-  const tx = (await getDB()).transaction(['sessions', 'sessionSummaries', 'files'], 'readwrite')
+  const tx = (await getDB()).transaction(
+    ['sessions', 'sessionSummaries', 'files', 'media', 'mediaThumbs'],
+    'readwrite'
+  )
   await Promise.all([
     (async () => {
       try {
@@ -143,6 +236,12 @@ export const deleteSession = async (sessionId: string): Promise<void> => {
         const summary = await summaries.get(sessionId)
         await tx.objectStore('sessions').delete(sessionId)
         await summaries.delete(sessionId)
+        const media = tx.objectStore('media')
+        const mediaIds = await media.index('sessionId').getAllKeys(sessionId)
+        for (const id of mediaIds) {
+          await media.delete(id)
+          await tx.objectStore('mediaThumbs').delete(id)
+        }
         for (const id of summary?.fileIds ?? []) {
           if ((await summaries.index('fileIds').count(id)) === 0) {
             await tx.objectStore('files').delete(id)
@@ -166,6 +265,28 @@ export const saveFiles = (files: StoredFile[]): Promise<void> => putFiles('files
 
 export const loadFile = async (id: string): Promise<Blob | undefined> =>
   (await (await getDB()).get('files', id))?.blob
+
+/** 登记素材库条目：重复登记同一 id 时更新元数据，不产生副本。 */
+export const addMedia = async (items: MediaItem[]): Promise<void> => {
+  if (items.length === 0) {
+    return
+  }
+  const tx = (await getDB()).transaction('media', 'readwrite')
+  await Promise.all([...items.map((item) => tx.store.put(item)), tx.done])
+}
+
+/** 素材库列表，按时间从新到旧 */
+export const listMedia = async (): Promise<MediaItem[]> => {
+  const items = await (await getDB()).getAll('media')
+  return items.sort((a, b) => b.createdAt - a.createdAt)
+}
+
+export const saveMediaThumb = async (id: string, blob: Blob): Promise<void> => {
+  await (await getDB()).put('mediaThumbs', { id, blob })
+}
+
+export const loadMediaThumb = async (id: string): Promise<Blob | undefined> =>
+  (await (await getDB()).get('mediaThumbs', id))?.blob
 
 /** 清空导入暂存：开始导入前清除上次中断（如关闭页面）遗留的数据，导入失败后清除本次写入。 */
 export const clearStaging = async (): Promise<void> => {
@@ -220,7 +341,15 @@ export const updateStagingFileTypes = async (types: ReadonlyMap<string, string>)
 export const commitStaging = async (): Promise<SessionSummary[]> => {
   const summaries: SessionSummary[] = []
   const tx = (await getDB()).transaction(
-    ['sessions', 'sessionSummaries', 'files', 'sessionsStaging', 'filesStaging'],
+    [
+      'sessions',
+      'sessionSummaries',
+      'files',
+      'media',
+      'mediaThumbs',
+      'sessionsStaging',
+      'filesStaging',
+    ],
     'readwrite'
   )
   const move = async (from: 'sessionsStaging' | 'filesStaging', to: 'sessions' | 'files') => {
@@ -229,6 +358,9 @@ export const commitStaging = async (): Promise<SessionSummary[]> => {
       await target.clear()
       if (to === 'sessions') {
         await tx.objectStore('sessionSummaries').clear()
+        // 素材库与历史一一对应，换一批历史就整批重建
+        await tx.objectStore('media').clear()
+        await tx.objectStore('mediaThumbs').clear()
       }
       for (
         let cursor = await tx.objectStore(from).openCursor();
@@ -237,8 +369,12 @@ export const commitStaging = async (): Promise<SessionSummary[]> => {
       ) {
         await target.put(cursor.value)
         if (to === 'sessions') {
-          const summary = storedSummary(cursor.value as Session)
+          const session = cursor.value as Session
+          const summary = storedSummary(session)
           await tx.objectStore('sessionSummaries').put(summary)
+          for (const item of collectSessionMedia(session)) {
+            await tx.objectStore('media').put(item)
+          }
           summaries.push(toSessionSummary(summary))
         }
       }

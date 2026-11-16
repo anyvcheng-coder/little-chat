@@ -538,3 +538,32 @@ export const IconPaletteOutline16 = () => (
     <circle cx="10.6" cy="6.2" r=".95" fill="currentColor" />
   </svg>
 )
+
+/** 素材库图标：叠放的照片，前面一张带山与太阳 */
+export const IconLibraryOutline16 = () => (
+  <svg width={16} height={16} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect
+      x="2.2"
+      y="5.1"
+      width="8.7"
+      height="8.7"
+      rx="2.2"
+      stroke="currentColor"
+      strokeWidth={1.2}
+    />
+    <path
+      d="M5.6 5.1V4.1c0-1.1.9-2 2-2h4.2c1.1 0 2 .9 2 2v4.2c0 1.1-.9 2-2 2h-1"
+      stroke="currentColor"
+      strokeWidth={1.2}
+      strokeLinecap="round"
+    />
+    <circle cx="4.9" cy="8" r=".85" fill="currentColor" />
+    <path
+      d="M2.7 12.5 5 10.2c.3-.3.8-.3 1.1 0l1 1 1.1-1.1c.3-.3.8-.3 1.1 0l.9.9"
+      stroke="currentColor"
+      strokeWidth={1.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)

@@ -63,11 +63,13 @@ App name, icons, and theme color live in [public/manifest.webmanifest](public/ma
 
 ### Icons
 
-Icon sources are the SVGs in [public/icons](public/icons); re-render the web icons, Android launcher icons, and splash screens with your local Chrome:
+The icon is a single 1024×1024 bitmap, [public/icons/app-icon.jpg](public/icons/app-icon.jpg). The script trims the white margin, makes the area outside the rounded corners transparent, and re-renders the web icons, maskable icon, Android launcher icons, and splash screens:
 
 ```sh
 pnpm icons
 ```
+
+To change the icon, replace that image. Rendering uses headless Chrome, so no extra image dependencies are needed.
 
 ## Features
 
@@ -76,6 +78,7 @@ pnpm icons
 - Upload, paste, or drag and drop attachments; use voice input and read replies aloud. A live audio spectrum appears in the first row of the input area while recording on mobile.
 - Markdown, syntax highlighting, KaTeX math, and Mermaid diagrams.
 - Image generation: the chat model writes the prompt, then hands it off to an image API; results stay in the conversation with the prompt, model, and reference images, and can be regenerated after editing the prompt. Common models are built in (Volcengine Ark Seedream 5.5 / 5.0, OpenAI GPT Image 2 / 1.5, ...), and you can type any model ID to use a release that ships before the app updates.
+- Media library: images you upload or generate in chats are collected in the sidebar library, newest first, filterable by generated or uploaded. Open a full-size preview, download it, copy the prompt, jump back to the original chat, or drop it back into the input box as a reference image. The grid loads thumbnails only; originals are read when you open the preview.
 - Simplified Chinese and English, light and dark themes, an accent color and chat background (preset gradients or your own image, with adjustable dim and blur), mobile layouts, location settings, and chat history import and export.
 
 ## Data and storage
@@ -85,6 +88,8 @@ Your API key and settings are stored in the browser's localStorage. Conversation
 The accent color and chat background (including an uploaded image, downscaled to a 1440px long edge before saving) live only in this device's localStorage; they are not part of the exported history, so a new device starts with the defaults.
 
 History import and export in Settings use ZIP archives. After confirmation and successful validation, importing replaces all local conversations and attachments. Exports include conversations and locally available original images, but exclude API keys, settings, and original non-image attachments. See the [history import/export documentation (Chinese)](src/services/chat/history/README.md) for the archive format and preservation details.
+
+The media library keeps no second copy of any image: each entry points at the original stored with its conversation, and thumbnails are cached separately. Deleting a chat, importing a new history, or clearing everything removes the matching entries and thumbnails, so the library always equals the images in your current history. Using an image as a reference from the library puts it back into the input box; it is uploaded to the chat service as usual when you send.
 
 Settings → Data → Delete all chats clears all local conversations, original attachments, and unsent drafts after confirmation. It stops ongoing replies and returns to a new chat. Your API key and settings are preserved; files already uploaded to the API service are not deleted.
 
